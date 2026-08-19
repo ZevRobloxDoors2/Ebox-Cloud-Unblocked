@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Settings, Home, Library, Users, Bell, Headphones, Trophy, Store, ChevronLeft, Flame,
+  Settings, Home, Library, Users, Bell, Headphones, Trophy, Store, ChevronLeft, Flame, Search,
   Battery, BatteryCharging, BatteryFull, BatteryLow, BatteryMedium
 } from 'lucide-react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -25,6 +25,7 @@ import { useSpatialNavigation } from './hooks/useSpatialNavigation';
 import { ALL_GAMES } from './games';
 
 import { ActivityFeed } from './components/ActivityFeed';
+import { GlobalSearch } from './components/GlobalSearch';
 
 type View = 'home' | 'library' | 'profile' | 'settings' | 'notifications' | 'friends' | 'chat' | 'party' | 'activity';
 
@@ -102,6 +103,7 @@ export default function App() {
   const isGuestMode = sessionStorage.getItem('ebox_guest_mode') === 'true';
 
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [userAuth, setUserAuth] = useState(auth.currentUser);
   const [authLoaded, setAuthLoaded] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
@@ -368,6 +370,7 @@ export default function App() {
         <AuthFlow onConfirm={() => setActiveSessionConfirmed(true)} />
         <WelcomeMessage />
         <DMCAModal />
+      <GlobalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} onNavigate={(v) => setCurrentView(v as any)} onPlayGame={handlePlayGame} />
       </>
     );
   }
@@ -476,6 +479,9 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-6 text-zinc-100">
+          <button onClick={() => setIsSearchOpen(true)} className="hover:text-green-400 transition-colors focus:ring-2 focus:ring-green-500 focus:outline-none rounded-full p-1">
+            <Search size={22} />
+          </button>
           <button onClick={() => setCurrentView('notifications')} className="relative hover:text-green-400 transition-colors focus:ring-2 focus:ring-green-500 focus:outline-none rounded-full p-1">
             <Bell size={22} />
             {notificationCount > 0 && (
