@@ -1,5 +1,5 @@
-# Ebox Console Cloud Gaming
-Ebox is a Xbox simulator for students, Just fork the project, and then play, Below this message explains how to do that.
+# Aura OS Browser
+Aura OS is a chromebook simulator for students, Just fork the project, and then play, Below this message explains how to do that.
 
 ## How to Fork [Make your own link]
 Step 1: The top right of the screen on the page, Click Fork.
@@ -18,10 +18,10 @@ Step 5: Wait a few mins, refresh the pages tab, then there you go. Your own webs
 # Lisense
 The creator of this website must apply credits to Darden Proxies.
 If not, you will be asked to take down, the modifed verison of the website.
+The creator of this website haven't used a single UV proxy or Scramjet.
 
 # Unblocked Extensions
 - Securly
 - Hapara Highlights
 - GoGuardan
-- LanSchool Air
   ||MORE ARE COMING SOON||

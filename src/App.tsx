@@ -1,0 +1,720 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  Settings, Home, Library, Users, Bell, Headphones, Trophy, Store, ChevronLeft, Flame,
+  Battery, BatteryCharging, BatteryFull, BatteryLow, BatteryMedium
+} from 'lucide-react';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { doc, onSnapshot, updateDoc, serverTimestamp, collection, query, where, increment, addDoc } from 'firebase/firestore';
+
+import { auth, db } from './firebase';
+import { UserProfile } from './types';
+import { AuthFlow } from './components/AuthFlow';
+import { Profile } from './components/Profile';
+import { Friends } from './components/Friends';
+import { Chat } from './components/Chat';
+import { Notifications } from './components/Notifications';
+import { Party } from './components/Party';
+import { GuideMenu } from './components/GuideMenu';
+import { EboxMusicToast } from './components/EboxMusicToast';
+import { Settings as SettingsView } from './components/Settings';
+import { DMCAModal } from './components/DMCAModal';
+import { StartupAnimation } from './components/StartupAnimation';
+import { WelcomeMessage } from './components/WelcomeMessage';
+import { useSpatialNavigation } from './hooks/useSpatialNavigation';
+import { ALL_GAMES } from './games';
+
+import { ActivityFeed } from './components/ActivityFeed';
+
+type View = 'home' | 'library' | 'profile' | 'settings' | 'notifications' | 'friends' | 'chat' | 'party' | 'activity';
+
+const getThemeClasses = (themeId?: string) => {
+  switch (themeId) {
+    case 'midnight': return 'bg-blue-950';
+    case 'forest': return 'bg-green-950';
+    case 'purple': return 'bg-purple-950';
+    case 'crimson': return 'bg-red-950';
+    case 'cosmic': return 'bg-gradient-to-br from-indigo-950 via-purple-900 to-black';
+    case 'ocean': return 'bg-gradient-to-br from-blue-900 via-cyan-950 to-black';
+    case 'default':
+    default: return 'bg-[#101010]';
+  }
+};
+
+export default function App() {
+  const [activeSessionConfirmed, setActiveSessionConfirmed] = useState(false);
+  const [startupDone, setStartupDone] = useState(() => {
+    return sessionStorage.getItem('ebox_startup_done') === 'true';
+  });
+
+  const handleStartupComplete = () => {
+    sessionStorage.setItem('ebox_startup_done', 'true');
+    setStartupDone(true);
+  };
+
+  
+  useEffect(() => {
+    // Tab Cloak
+    const title = localStorage.getItem('cloak_title');
+    const icon = localStorage.getItem('cloak_icon');
+    if (title) document.title = title;
+    if (icon) {
+      let link = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
+      if (!link) {
+        link = document.createElement('link') as HTMLLinkElement;
+        link.rel = 'icon';
+        document.getElementsByTagName('head')[0].appendChild(link);
+      }
+      link.href = icon;
+    }
+
+    // Auto about:blank
+    if (localStorage.getItem('auto_about_blank') === 'true') {
+      if (window.location.href !== 'about:blank' && window.self === window.top) {
+        let win = window.open('about:blank', '_blank');
+        if (win) {
+          let iframe = win.document.createElement('iframe');
+          iframe.src = window.location.href;
+          iframe.style.width = '100vw';
+          iframe.style.height = '100vh';
+          iframe.style.border = 'none';
+          iframe.style.margin = '0';
+          iframe.style.padding = '0';
+          win.document.body.style.margin = '0';
+          win.document.body.appendChild(iframe);
+          window.location.replace('https://www.google.com');
+        }
+      }
+    }
+  }, []);
+
+  
+  useEffect(() => {
+    const i = setInterval(() => {
+      setSortAZ(localStorage.getItem('sort_az') === 'true');
+      setMobileSizer(localStorage.getItem('mobile_sizer') === 'true');
+    }, 500);
+    return () => clearInterval(i);
+  }, []);
+
+  useSpatialNavigation();
+  
+  const isGuestMode = sessionStorage.getItem('ebox_guest_mode') === 'true';
+
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [userAuth, setUserAuth] = useState(auth.currentUser);
+  const [authLoaded, setAuthLoaded] = useState(false);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [currentView, setCurrentView] = useState<View>('home');
+  const [libraryTab, setLibraryTab] = useState<'games'|'apps'>('games');
+  
+  const activeProfile = isGuestMode ? {
+    uid: 'guest',
+    gamertag: 'Guest Player',
+    gamertagLower: 'guest player',
+    avatar: 'https://ui-avatars.com/api/?name=Guest&background=10b981&color=fff',
+    status: 'Online',
+    score: 0,
+    homeTheme: 'default',
+    recentGames: []
+  } : profile;
+
+  const [time, setTime] = useState('');
+  const [sortAZ, setSortAZ] = useState(localStorage.getItem('sort_az') === 'true');
+  const [mobileSizer, setMobileSizer] = useState(localStorage.getItem('mobile_sizer') === 'true');
+  const displayGames = sortAZ ? [...ALL_GAMES].sort((a,b) => a.title.localeCompare(b.title)) : ALL_GAMES;
+  const [batteryInfo, setBatteryInfo] = useState<{ level: number, charging: boolean, isSupported: boolean }>({ level: 100, charging: false, isSupported: true });
+
+  useEffect(() => {
+    // Battery Status API
+    if ('getBattery' in navigator) {
+      (navigator as any).getBattery().then((battery: any) => {
+        const updateBatteryInfo = () => {
+          setBatteryInfo({
+            level: Math.round(battery.level * 100),
+            charging: battery.charging,
+            isSupported: true
+          });
+        };
+        updateBatteryInfo();
+        battery.addEventListener('levelchange', updateBatteryInfo);
+        battery.addEventListener('chargingchange', updateBatteryInfo);
+      });
+    } else {
+      setBatteryInfo(prev => ({ ...prev, isSupported: false }));
+    }
+  }, []);
+  
+  const [chatFriendId, setChatFriendId] = useState('');
+  const [chatFriendGamertag, setChatFriendGamertag] = useState('');
+  
+  // Playing state
+  const [playingGame, setPlayingGame] = useState<{ id: string, title: string, file: string } | null>(null);
+  const [playMinutes, setPlayMinutes] = useState(0);
+  const [suspendedGames, setSuspendedGames] = useState<{game: {id: string, title: string, file: string}, minutes: number}[]>([]);
+  const [pendingGameToPlay, setPendingGameToPlay] = useState<{id: string, title: string, file: string} | null>(null);
+
+  const [isLoadingGame, setIsLoadingGame] = useState(false);
+  const [showTrophyToast, setShowTrophyToast] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  const [showGreetingToast, setShowGreetingToast] = useState(false);
+
+  useEffect(() => {
+    if (profile && currentView === 'home' && !showGreetingToast) {
+      setShowGreetingToast(true);
+      setTimeout(() => setShowGreetingToast(false), 5000);
+    }
+  }, [profile?.uid]);
+
+  // Rotational Domains to bypass generic filters
+  const DOMAINS = [
+    'https://play.geometry-dash.co',
+    'https://tunnel.education-unblocked.com',
+    'https://study.math-games-fun.net',
+    'https://research.science-exploration.org',
+    'https://proxy.student-portal-access.com',
+    'https://app.learning-hub-interactive.io',
+    'https://node.homework-helper-online.net',
+    'https://gateway.k12-resources-hub.com'
+  ];
+
+  const getUrl = (file: string, index: number) => {
+    if (file.startsWith('http://') || file.startsWith('https://')) {
+      return file;
+    }
+    return `/${file}`;
+  };
+
+  const actuallyPlayGame = async (game: {id: string, title: string, file: string}) => {
+    setIsLoadingGame(true);
+    setPlayingGame(game);
+    
+    // Restore minutes if resuming
+    const suspended = suspendedGames.find(s => s.game.id === game.id);
+    if (suspended) {
+      setPlayMinutes(suspended.minutes);
+      // Remove from suspended when actively playing
+      setSuspendedGames(prev => prev.filter(s => s.game.id !== game.id));
+    } else {
+      setPlayMinutes(0);
+    }
+
+    if (profile) {
+      const recent = activeProfile.recentGames || [];
+      const updatedRecent = [{ gameId: game.id, lastPlayed: new Date().toISOString() }, ...recent.filter(g => g.gameId !== game.id)].slice(0, 10);
+      try {
+        await updateDoc(doc(db, 'users', activeProfile.uid), { recentGames: updatedRecent });
+        await addDoc(collection(db, 'activities'), {
+          type: 'game',
+          uid: activeProfile.uid,
+          gamertag: activeProfile.gamertag,
+          avatar: activeProfile.avatar || '',
+          details: `Started playing ${game.title}`,
+          createdAt: serverTimestamp()
+        });
+      } catch (err) {
+        console.error("Failed to update recent games", err);
+      }
+    }
+    setTimeout(() => {
+      setIsLoadingGame(false);
+    }, 2000);
+  };
+
+  const handlePlayGame = async (game: {id: string, title: string, file: string}) => {
+    if (profile?.quickResumeEnabled && suspendedGames.length >= 6 && !suspendedGames.find(s => s.game.id === game.id)) {
+      setPendingGameToPlay(game);
+      return;
+    }
+    await actuallyPlayGame(game);
+  };
+
+  const handleStopGame = () => {
+    if (playingGame && profile?.quickResumeEnabled) {
+      // Suspend it
+      setSuspendedGames(prev => {
+        // If it's already there, replace it, though it shouldn't be
+        const filtered = prev.filter(s => s.game.id !== playingGame.id);
+        return [...filtered, { game: playingGame, minutes: playMinutes }];
+      });
+    }
+    setPlayingGame(null);
+    setPlayMinutes(0);
+  };
+
+  useEffect(() => {
+    if (!profile) return;
+    const qReqs = query(collection(db, 'friendRequests'), where('toUid', '==', activeProfile.uid), where('status', '==', 'pending'));
+    const qAlerts = query(collection(db, 'systemAlerts'), where('toUid', '==', activeProfile.uid), where('read', '==', false));
+    
+    let reqsCount = 0;
+    let alertsCount = 0;
+
+    const unsubReqs = onSnapshot(qReqs, (snap) => {
+      reqsCount = snap.docs.length;
+      setNotificationCount(reqsCount + alertsCount);
+    }, (err) => console.error(err));
+    
+    const unsubAlerts = onSnapshot(qAlerts, (snap) => {
+      alertsCount = snap.docs.length;
+      setNotificationCount(reqsCount + alertsCount);
+    }, (err) => console.error(err));
+    
+    return () => { unsubReqs(); unsubAlerts(); };
+  }, [profile]);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUserAuth(u);
+      setAuthLoaded(true);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (!userAuth) {
+      setProfileLoaded(true);
+      return;
+    }
+    const unsub = onSnapshot(doc(db, 'users', userAuth.uid), (docSnap) => {
+      if (docSnap.exists()) {
+        setProfile(docSnap.data() as UserProfile);
+      } else {
+        setProfile(null);
+      }
+      setProfileLoaded(true);
+    }, (error) => {
+      console.error(error);
+      setProfileLoaded(true);
+    });
+    return () => unsub();
+  }, [userAuth]);
+
+  useEffect(() => {
+    const updateTime = () => setTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    updateTime();
+    const interval = setInterval(updateTime, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Trophies logic (Every 2 mins of playing = 10 trophies)
+  useEffect(() => {
+    if (!playingGame || !profile) return;
+    const interval = setInterval(() => {
+      setPlayMinutes(prev => {
+        const next = prev + 1;
+        if (next > 0 && next % 2 === 0) {
+          // Give trophies!
+          // We must ensure 2 mins passed in firestore terms or just update it
+          // Wait, the rule says: request.time.toMillis() >= existing().lastTrophyAt.toMillis() + 120000
+          // To make sure it passes, we attempt the update
+          const award = async () => {
+            if (isGuestMode) return;
+            try {
+              await updateDoc(doc(db, 'users', activeProfile.uid), {
+                score: increment(10),
+                lastTrophyAt: serverTimestamp()
+              });
+              await addDoc(collection(db, 'activities'), {
+                type: 'trophy',
+                uid: activeProfile.uid,
+                gamertag: activeProfile.gamertag,
+                avatar: activeProfile.avatar || '',
+                details: `Unlocked an achievement! (+10 🏆)`,
+                createdAt: serverTimestamp()
+              });
+              setShowTrophyToast(true);
+              
+              if (activeProfile.vibrationEnabled !== false && navigator.getGamepads) {
+                const gamepads = navigator.getGamepads();
+                for (const gp of gamepads) {
+                  if (gp && gp.vibrationActuator) {
+                    gp.vibrationActuator.playEffect("dual-rumble", {
+                      startDelay: 0,
+                      duration: 500,
+                      weakMagnitude: 1.0,
+                      strongMagnitude: 1.0
+                    }).catch(() => {});
+                  }
+                }
+              }
+
+              setTimeout(() => setShowTrophyToast(false), 4000);
+            } catch(e) {
+              console.error("Trophy error:", e);
+            }
+          };
+          award();
+        }
+        return next;
+      });
+    }, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [playingGame, profile]);
+
+  if (!startupDone) {
+    return <StartupAnimation onComplete={handleStartupComplete} />;
+  }
+
+  if (!authLoaded) {
+    return <div className="min-h-screen bg-black flex items-center justify-center text-white"><div className="w-8 h-8 border-4 border-zinc-800 border-t-green-500 rounded-full animate-spin"></div></div>;
+  }
+
+  if (!isGuestMode && !activeSessionConfirmed) {
+    return (
+      <>
+        <AuthFlow onConfirm={() => setActiveSessionConfirmed(true)} />
+        <WelcomeMessage />
+        <DMCAModal />
+      </>
+    );
+  }
+
+  if (!isGuestMode && (userAuth && !profileLoaded)) {
+    return <div className="min-h-screen bg-black flex items-center justify-center text-white"><div className="w-8 h-8 border-4 border-zinc-800 border-t-green-500 rounded-full animate-spin"></div></div>;
+  }
+  
+  if (!isGuestMode && (!userAuth || !profile)) {
+    return null;
+  }
+
+  const handleLogout = () => {
+    if (isGuestMode) {
+      sessionStorage.removeItem('ebox_guest_mode');
+      window.location.reload();
+    } else {
+      signOut(auth);
+      setActiveSessionConfirmed(false);
+    }
+  };
+
+  return (
+    <>
+      <DMCAModal />
+      <div className={`h-screen ${getThemeClasses(activeProfile.homeTheme)} text-white font-sans overflow-hidden flex flex-col relative z-0`} style={mobileSizer ? { transform: 'scale(0.8)', transformOrigin: 'center top', width: '125%', height: '125%', left: '-12.5%' } : {}}>
+      <WelcomeMessage />
+      <div className="fixed inset-0 z-[-1] opacity-50">
+        <div className="absolute inset-0 bg-gradient-to-tr from-black/80 via-transparent to-black/40" />
+      </div>
+
+      {!playingGame && (
+        <motion.button 
+          layoutId="guide-button"
+          onClick={() => setIsGuideOpen(true)}
+          className="fixed top-8 right-8 z-[260] w-12 h-12 rounded-full bg-green-500 hover:bg-green-400 text-black font-bold text-xl flex items-center justify-center shadow-lg transition-transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-green-500/50"
+        >
+          E
+        </motion.button>
+      )}
+
+      <EboxMusicToast />
+      <GuideMenu 
+        isOpen={isGuideOpen} 
+        onClose={() => setIsGuideOpen(false)} 
+        recentGames={activeProfile.recentGames || []}
+        onNavigate={(view) => {
+          if (playingGame && view !== 'home') {
+             setPlayingGame(null); // Optionally exit game when navigating away
+          }
+          setCurrentView(view as View);
+        }}
+      />
+
+      <AnimatePresence>
+        {pendingGameToPlay && (
+          <motion.div initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="fixed inset-0 z-[300] bg-black/80 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-zinc-900 border border-zinc-800 p-6 rounded-lg max-w-md w-full shadow-2xl">
+              <h2 className="text-xl font-bold mb-2">Quick Resume Limit Reached</h2>
+              <p className="text-zinc-400 mb-6 text-sm">
+                You have reached the maximum of 6 suspended games. Would you like to close the oldest suspended game ({suspendedGames[0]?.game.title}) to launch this new game, or cancel?
+              </p>
+              <div className="flex gap-4 justify-end">
+                <button 
+                  onClick={() => setPendingGameToPlay(null)}
+                  className="px-4 py-2 rounded-md hover:bg-zinc-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    const newSuspended = suspendedGames.slice(1);
+                    setSuspendedGames(newSuspended);
+                    const game = pendingGameToPlay;
+                    setPendingGameToPlay(null);
+                    actuallyPlayGame(game);
+                  }}
+                  className="px-4 py-2 rounded-md bg-green-600 hover:bg-green-500 font-bold transition-colors text-white"
+                >
+                  Close Oldest & Play
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <nav className="flex items-start justify-between px-12 pt-12 pb-4 z-50 shrink-0">
+        <div 
+          className="flex items-center gap-4 cursor-pointer hover:bg-white/10 p-2 -ml-2 rounded-xl transition-colors focus:ring-2 focus:ring-green-500 focus:outline-none"
+          onClick={() => setCurrentView('profile')}
+          tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('profile')}
+        >
+          <img src={activeProfile.avatar} alt="Avatar" className="w-14 h-14 rounded-full border-2 border-white/20 object-cover" />
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <h2 className="font-semibold text-lg leading-tight">
+                {activeProfile.gamertag}
+              </h2>
+            </div>
+            <div className="flex items-center gap-1.5 text-zinc-300 mt-0.5">
+              <Trophy size={14} className="text-zinc-400" />
+              <span className="text-sm font-medium">{activeProfile.score}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-6 text-zinc-100">
+          <button onClick={() => setCurrentView('notifications')} className="relative hover:text-green-400 transition-colors focus:ring-2 focus:ring-green-500 focus:outline-none rounded-full p-1">
+            <Bell size={22} />
+            {notificationCount > 0 && (
+              <span className="absolute -top-1 -right-1.5 bg-green-500 text-black text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-[#1a1a1a]">
+                {notificationCount}
+              </span>
+            )}
+          </button>
+          <button onClick={() => setCurrentView('friends')} className="hover:text-green-400 transition-colors focus:ring-2 focus:ring-green-500 focus:outline-none rounded-full p-1">
+            <Users size={22} />
+          </button>
+          <div className="flex items-center gap-4">
+            {batteryInfo.isSupported && (
+              <div className="flex items-center gap-1.5 text-zinc-300">
+                <span className="text-sm font-medium">{batteryInfo.level}%</span>
+                {batteryInfo.charging ? (
+                  <BatteryCharging size={20} className="text-green-400" />
+                ) : (
+                  <>
+                    {batteryInfo.level > 80 && <BatteryFull size={20} />}
+                    {batteryInfo.level > 20 && batteryInfo.level <= 80 && <BatteryMedium size={20} />}
+                    {batteryInfo.level <= 20 && <BatteryLow size={20} className="text-red-500" />}
+                  </>
+                )}
+              </div>
+            )}
+            <span className="font-semibold text-lg">{time}</span>
+          </div>
+        </div>
+      </nav>
+
+      <AnimatePresence>
+        {showGreetingToast && (
+          <motion.div 
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] bg-zinc-900/40 backdrop-blur-md border border-white/10 px-6 py-3 rounded-full flex items-center gap-4 shadow-2xl"
+          >
+            <div className="w-8 h-8 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center">
+              <span className="text-lg">👋</span>
+            </div>
+            <div>
+              <p className="font-bold text-sm text-white">
+                {(() => {
+                  const hour = new Date().getHours();
+                  if (hour < 12) return 'Good morning, ';
+                  if (hour < 18) return 'Good afternoon, ';
+                  return 'Good evening, ';
+                })()}
+                {profile?.gamertag}!
+              </p>
+              <p className="text-zinc-400 text-xs font-semibold">Welcome back to dashboard.</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showTrophyToast && (
+          <motion.div 
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] bg-zinc-900/40 backdrop-blur-md border border-white/10 px-6 py-3 rounded-full flex items-center gap-4 shadow-2xl"
+          >
+            <div className="w-8 h-8 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center">
+              <Trophy size={16} />
+            </div>
+            <div>
+              <p className="font-bold text-sm text-white">Achievement Unlocked</p>
+              <p className="text-green-400 text-xs font-semibold">+10 Trophies earned!</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {(playingGame || suspendedGames.length > 0) && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className={`fixed inset-0 z-[100] bg-black flex flex-col ${playingGame ? '' : 'pointer-events-none opacity-0'}`}
+            style={{ display: playingGame ? 'flex' : 'none' }}
+          >
+            <AnimatePresence>
+              {isLoadingGame && playingGame && (
+                <motion.div 
+                  initial={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 z-[110] bg-black flex flex-col items-center justify-center gap-6"
+                >
+                  <div className="w-16 h-16 border-4 border-zinc-800 border-t-green-500 rounded-full animate-spin" />
+                  <p className="text-xl font-semibold animate-pulse">Loading {playingGame.title}...</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {playingGame && (
+              <div className="h-12 bg-zinc-900 flex items-center justify-between px-4 shrink-0 shadow-md">
+                <span className="font-bold text-green-400">Playing {playingGame.title} ({playMinutes}m) - Earned: {Math.floor(playMinutes / 2) * 10} 🏆</span>
+                <div className="flex items-center gap-4">
+                  <motion.button 
+                    layoutId="guide-button"
+                    onClick={() => setIsGuideOpen(true)}
+                    className="z-[260] w-8 h-8 rounded-full bg-green-500 hover:bg-green-400 text-black font-bold flex items-center justify-center shadow-lg transition-transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-green-500/50"
+                  >
+                    E
+                  </motion.button>
+                  <button onClick={handleStopGame} className="bg-red-600 px-4 py-1.5 rounded-md font-bold hover:bg-red-500 transition-colors flex items-center gap-2">
+                     Stop Game
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            {(() => {
+              const allActive = [...suspendedGames.map(s => s.game)];
+              if (playingGame && !allActive.find(g => g.id === playingGame.id)) {
+                allActive.push(playingGame);
+              }
+              return allActive.map((g, idx) => (
+                <div className={playingGame?.id === g.id ? "flex-1 w-full relative bg-white block" : "hidden"} key={g.id}>
+                  
+                  {localStorage.getItem('anti_deledao') === 'true' && playingGame?.id === g.id && (
+                    <div className="absolute inset-0 pointer-events-none z-[105]" style={{ backgroundImage: 'url(https://upload.wikimedia.org/wikipedia/commons/c/c3/Google_Docs_logo_%282014-2020%29.svg)', opacity: 0.05, backgroundSize: '100px', backgroundRepeat: 'repeat' }} />
+                  )}
+
+                  <iframe 
+                  key={g.id}
+                  src={getUrl(g.file, idx)} 
+                  className="w-full h-full" 
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups allow-presentation"
+                  allow="fullscreen; autoplay; gamepad"
+                  onLoad={() => { if (playingGame?.id === g.id) setIsLoadingGame(false); }}
+                />
+                </div>
+              ));
+            })()}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <main className="flex-1 min-h-0 overflow-hidden relative z-10 flex flex-col w-full">
+        <AnimatePresence mode="wait">
+          {currentView === 'home' && (
+            <motion.div key="home" initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="px-12 flex flex-col gap-6 mt-4 flex-1 min-h-0 overflow-y-auto pb-12 w-full justify-center">
+              <div className="flex gap-4 shrink-0 overflow-x-auto pb-4 items-center">
+                <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('library')} onClick={() => setCurrentView('library')} className="w-[160px] h-[160px] bg-zinc-800/90 rounded-md flex flex-col justify-center items-center relative overflow-hidden cursor-pointer hover:border-white focus:border-green-500 outline-none border-[3px] border-transparent transition-all shrink-0 group">
+                  <Library className="text-zinc-300 mb-2 group-hover:text-white transition-colors" size={48} />
+                  <span className="font-semibold text-sm text-center px-1 text-white">My games & apps</span>
+                </div>
+                
+                {displayGames.slice(0,8).map((g) => (
+                  <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handlePlayGame({id: g.id, title: g.title, file: g.file})} key={g.id} onClick={() => handlePlayGame({id: g.id, title: g.title, file: g.file})} className="w-[160px] h-[160px] bg-zinc-800 rounded-md overflow-hidden border-[3px] border-transparent hover:border-white focus:border-green-500 outline-none cursor-pointer transition-colors group shrink-0 relative">
+                    <img src={g.image} className="w-full h-full object-cover group-hover:scale-105 group-focus:scale-105 transition-transform" />
+                  </div>
+                ))}
+
+                <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('settings')} onClick={() => setCurrentView('settings')} className="w-[160px] h-[160px] bg-zinc-800/90 border-[3px] border-transparent hover:border-white focus:border-green-500 outline-none rounded-md flex flex-col justify-center items-center relative cursor-pointer group transition-all shrink-0">
+                  <Settings size={48} className="text-zinc-300 group-hover:text-white group-focus:text-white transition-colors mb-2" />
+                  <span className="font-semibold text-sm text-white">Settings</span>
+                </div>
+
+                <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('friends')} onClick={() => setCurrentView('friends')} className="w-[160px] h-[160px] bg-purple-600 rounded-md flex flex-col justify-center items-center border-[3px] border-transparent hover:border-white focus:border-green-500 outline-none cursor-pointer transition-colors shrink-0">
+                  <Users size={48} className="text-white mb-2" />
+                  <span className="font-semibold text-sm text-white">Friends</span>
+                </div>
+
+                <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('activity')} onClick={() => setCurrentView('activity')} className="w-[160px] h-[160px] bg-blue-600 rounded-md flex flex-col justify-center items-center border-[3px] border-transparent hover:border-white focus:border-green-500 outline-none cursor-pointer transition-colors shrink-0 group">
+                  <Flame size={48} className="text-white mb-2 group-hover:text-yellow-400 transition-colors" />
+                  <span className="font-semibold text-sm text-white">Activity</span>
+                </div>
+
+                <div tabIndex={0} className="w-[160px] h-[160px] bg-zinc-200 rounded-md flex flex-col justify-center items-center border-[3px] border-transparent hover:border-white focus:border-green-500 outline-none cursor-pointer transition-colors shrink-0 group">
+                  <Store size={48} className="text-zinc-800 mb-2 group-hover:scale-105 transition-transform" />
+                  <span className="font-semibold text-sm text-zinc-900">Store</span>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {currentView === 'library' && (
+            <motion.div key="library" initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="px-12 flex flex-col gap-6 pt-4 flex-1 min-h-0 pb-12 w-full">
+              <div className="flex items-center gap-4 mb-2 shrink-0">
+                <button onClick={() => setCurrentView('home')} className="p-2 hover:bg-white/10 rounded-full transition-colors -ml-2">
+                  <ChevronLeft size={24} />
+                </button>
+                <h2 className="text-3xl font-black">My games & apps</h2>
+              </div>
+              <div className="flex flex-1 min-h-0 gap-8">
+                <div className="w-48 flex flex-col gap-2 shrink-0">
+                  <button 
+                    onClick={() => setLibraryTab('games')}
+                    className={`text-left px-4 py-3 rounded-md font-bold transition-colors ${libraryTab === 'games' ? 'bg-green-600 text-white' : 'hover:bg-white/10 text-zinc-400'}`}
+                  >
+                    Games
+                  </button>
+                  <button 
+                    onClick={() => setLibraryTab('apps')}
+                    className={`text-left px-4 py-3 rounded-md font-bold transition-colors ${libraryTab === 'apps' ? 'bg-green-600 text-white' : 'hover:bg-white/10 text-zinc-400'}`}
+                  >
+                    Apps
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 pb-12">
+                    {displayGames.filter(g => (g as any).type === (libraryTab === 'games' ? 'game' : 'app')).map(item => (
+                      <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handlePlayGame({id: item.id, title: item.title, file: item.file})} key={item.id} onClick={() => handlePlayGame({id: item.id, title: item.title, file: item.file})} className="relative group cursor-pointer flex flex-col focus:outline-none">
+                        <div className="aspect-[3/4] bg-zinc-800 rounded-md overflow-hidden border-[3px] border-transparent group-hover:border-green-500 group-focus:border-green-500 transition-colors shadow-lg">
+                          <img src={item.image} className="w-full h-full object-cover group-hover:scale-105 group-focus:scale-105 transition-transform" alt={item.title} />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 group-focus:opacity-100 flex items-center justify-center transition-opacity">
+                            <Trophy size={48} className="text-green-500" />
+                          </div>
+                        </div>
+                        <div className="mt-2 px-1">
+                          <p className="font-semibold text-sm truncate">{item.title}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {currentView === 'profile' && <Profile key="profile" userProfile={activeProfile} onBack={() => setCurrentView('home')} />}
+          
+          {currentView === 'friends' && <Friends key="friends" userProfile={activeProfile} onBack={() => setCurrentView('home')} onChat={(fId, fTag) => { setChatFriendId(fId); setChatFriendGamertag(fTag); setCurrentView('chat'); }} />}
+          
+          {currentView === 'notifications' && <Notifications key="notifications" userProfile={activeProfile} onBack={() => setCurrentView('home')} />}
+          {currentView === 'party' && <Party key="party" profile={activeProfile} onBack={() => setCurrentView('home')} />}
+          {currentView === 'activity' && <ActivityFeed key="activity" />}
+          {currentView === 'chat' && <Chat key="chat" userProfile={activeProfile} friendId={chatFriendId} friendGamertag={chatFriendGamertag} onBack={() => setCurrentView('friends')} />}
+
+          {currentView === 'settings' && <SettingsView profile={activeProfile as any} onBack={() => setCurrentView('home')} onLogout={handleLogout} isGuestMode={isGuestMode} />}
+        </AnimatePresence>
+      </main>
+    </div>
+    </>
+  );
+}
