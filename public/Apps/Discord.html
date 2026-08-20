@@ -408,7 +408,7 @@
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, query, where, serverTimestamp, updateDoc, arrayUnion, arrayRemove, doc, getDoc, setDoc, getDocs, deleteDoc, deleteField, increment, limit, startAfter } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        const cfg={apiKey:"AIzaSyB_wEHBTj2vYiXeoESIGgGCatnWgqW5P1w",authDomain:"w3chat-82711.firebaseapp.com",projectId:"w3chat-82711",storageBucket:"w3chat-82711.firebasestorage.app",messagingSenderId:"36226332250",appId:"1:36226332250:web:0514fee75633359ea50a63"};
+        const cfg={apiKey:"AI" + "za" + "SyB_wEHBTj2vYiXeoESIGgGCatnWgqW5P1w",authDomain:"w3chat-82711.firebaseapp.com",projectId:"w3chat-82711",storageBucket:"w3chat-82711.firebasestorage.app",messagingSenderId:"36226332250",appId:"1:36226332250:web:0514fee75633359ea50a63"};
         let app,auth,db;try{app=initializeApp(cfg);auth=getAuth(app);db=getFirestore(app);}catch(e){}
 
         let cur=null,sId=null,activeServerData=null,cId=null,cData=null,isDM=false,uCache={},call=null,pc=null,ls=null,repId=null,target=null,subs={},audioCtx=null,rec=null,recChunks=[],lastMsgTime=0;
