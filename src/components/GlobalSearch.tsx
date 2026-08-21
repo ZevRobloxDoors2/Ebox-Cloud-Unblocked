@@ -123,11 +123,11 @@ export function GlobalSearch({ isOpen, onClose, onNavigate, onPlayGame }: Global
                       >
                         {item.type === 'system' ? (
                           <div className="w-12 h-12 rounded-lg bg-zinc-800 flex items-center justify-center">
-                            <item.icon size={24} className="text-zinc-300" />
+                            {React.createElement((item as any).icon, { size: 24, className: "text-zinc-300" })}
                           </div>
                         ) : (
                           <div className="w-12 h-12 rounded-lg bg-zinc-800 overflow-hidden">
-                            <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+                            <img src={(item as any).image} alt={item.title} className="w-full h-full object-cover" />
                           </div>
                         )}
                         <div className="flex flex-col">

@@ -95,7 +95,9 @@ export default function App() {
       setSortAZ(localStorage.getItem('sort_az') === 'true');
       setMobileSizer(localStorage.getItem('mobile_sizer') === 'true');
     }, 500);
-    
+    return () => clearInterval(i);
+  }, []);
+
   useEffect(() => {
     const style = document.createElement('style');
     style.innerHTML = `
@@ -106,9 +108,6 @@ export default function App() {
     `;
     document.head.appendChild(style);
     return () => style.remove();
-  }, []);
-
-  return () => clearInterval(i);
   }, []);
 
   useSpatialNavigation();
