@@ -6,8 +6,10 @@ import { viteSingleFile } from 'vite-plugin-singlefile';
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
+  const isGitHubPages = process.env.GITHUB_PAGES === 'true';
+  
   return {
-    base: './',
+    base: isGitHubPages ? '/Ebox-Cloud-Unblocked/' : './',
     plugins: [react(), tailwindcss(), viteSingleFile()],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
