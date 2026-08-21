@@ -169,9 +169,7 @@ export default function App() {
   const [suspendedGames, setSuspendedGames] = useState<{game: {id: string, title: string, file: string}, minutes: number}[]>([]);
   const [pendingGameToPlay, setPendingGameToPlay] = useState<{id: string, title: string, file: string} | null>(null);
   const [warningGame, setWarningGame] = useState<{id: string, title: string, file: string} | null>(null);
-  const [showDropboxPrompt, setShowDropboxPrompt] = useState(
-    !localStorage.getItem('dropbox_prompt') && window.location !== window.parent.location === false
-  );
+  const [showDropboxPrompt, setShowDropboxPrompt] = useState(true);
   const [dropboxToast, setDropboxToast] = useState(false);
 
   const handleDropbox = (choice: string) => {
@@ -207,6 +205,13 @@ export default function App() {
     }
   };
 
+  // Hide dropbox prompt if it's been dismissed before
+  useEffect(() => {
+    const dropboxChoice = localStorage.getItem('dropbox_prompt');
+    if (dropboxChoice) {
+      setShowDropboxPrompt(false);
+    }
+  }, []);
 
   const [isLoadingGame, setIsLoadingGame] = useState(false);
   const [showTrophyToast, setShowTrophyToast] = useState(false);
@@ -452,7 +457,7 @@ export default function App() {
   return (
     <>
       <DMCAModal />
-      <div className={`h-screen ${getThemeClasses(activeProfile.homeTheme)} text-white font-sans overflow-hidden flex flex-col relative z-0`} style={mobileSizer ? { transform: 'scale(0.8)', transformOrigin: 'center top', width: '125%', height: '125%', left: '-12.5%' } : {}}>
+      <div className={`h-screen ${getThemeClasses(activeProfile.homeTheme)} text-white font-sans overflow-hidden flex flex-col relative z-0`} style={mobileSizer ? { transform: 'scale(0.8)', transformOrigin: 'top left', width: '125%', height: '125%' } : {}}>
       <WelcomeMessage />
       <div className="fixed inset-0 z-[-1] opacity-50">
         <div className="absolute inset-0 bg-gradient-to-tr from-black/80 via-transparent to-black/40" />
@@ -462,7 +467,7 @@ export default function App() {
         <motion.button 
           layoutId="guide-button"
           onClick={() => setIsGuideOpen(true)}
-          className="fixed top-8 right-8 z-[260] w-12 h-12 rounded-full bg-green-500 hover:bg-green-400 text-black font-bold text-xl flex items-center justify-center shadow-lg transition-transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-green-500/50"
+          className="fixed top-8 right-8 z-[260] w-12 h-12 rounded-full bg-green-500 hover:bg-green-400 text-black font-bold text-xl flex items-center justify-center shadow-lg transition-transform hover:scale-105"
         >
           E
         </motion.button>
@@ -482,8 +487,124 @@ export default function App() {
       />
 
       <AnimatePresence>
+        {showDropboxPrompt && !playingGame && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-sm flex items-center justify-center"
+          >
+            <motion.div 
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              className="bg-zinc-900 border-2 border-yellow-500 p-8 rounded-lg max-w-2xl w-full shadow-2xl mx-4"
+            >
+              <h2 className="text-2xl font-bold mb-4 text-yellow-400">🚀 Anti-Teacher Mode</h2>
+              <p className="text-zinc-300 mb-6 text-lg leading-relaxed">
+                Do you want to go in DROPBOX?
+              </p>
+              <div className="space-y-3 mb-8 bg-zinc-800/50 p-4 rounded border border-zinc-700">
+                <p className="text-zinc-200"><span className="text-green-400 font-bold">→ About:Blank</span> (Might Work)</p>
+                <p className="text-zinc-200"><span className="text-green-400 font-bold">→ Blob</span> (Recommended)</p>
+                <p className="text-zinc-200"><span className="text-green-400 font-bold">→ Filesystem</span> (Unrecommended - some games might not work, but it is hidden to the teacher.)</p>
+                <p className="text-zinc-200"><span className="text-green-400 font-bold">→ HTML File</span> (Very Recommended, COMING SOON!!!)</p>
+              </div>
+              <p className="text-zinc-400 text-sm mb-6">
+                ℹ️ This is used to bypass School Teachers Watching Your Screen.
+              </p>
+              <div className="flex gap-4 justify-end">
+                <button 
+                  onClick={() => handleDropbox('never')}
+                  className="px-6 py-2 rounded-md bg-red-600 hover:bg-red-500 font-bold transition-colors text-white"
+                >
+                  Never
+                </button>
+                <button 
+                  onClick={() => handleDropbox('ask')}
+                  className="px-6 py-2 rounded-md bg-yellow-600 hover:bg-yellow-500 font-bold transition-colors text-white"
+                >
+                  Ask Later
+                </button>
+                <button 
+                  onClick={() => handleDropbox('always')}
+                  className="px-6 py-2 rounded-md bg-green-600 hover:bg-green-500 font-bold transition-colors text-white"
+                >
+                  Always
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {dropboxToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] text-white font-bold text-lg"
+          >
+            <div className="bg-zinc-900 border border-zinc-700 px-6 py-3 rounded-lg shadow-lg animate-pulse">
+              To enable, go to settings
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {warningGame && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-sm flex items-center justify-center"
+          >
+            <motion.div 
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              className="bg-zinc-900 border-2 border-red-500 p-8 rounded-lg max-w-md w-full shadow-2xl mx-4"
+            >
+              <h2 className="text-2xl font-bold mb-4 text-red-400">⚠️ Warning</h2>
+              <p className="text-white mb-6 text-lg font-semibold">
+                DO NOT CLICK NOTHING ON THE SCREEN IF IT SAYS "404 page not found"
+              </p>
+              <p className="text-zinc-300 mb-8 leading-relaxed">
+                Just click continue and click Stop game, if it shows 404 page not found. If it doesn't, just continue and play the game.
+              </p>
+              <div className="flex items-center gap-2 mb-6 bg-red-900/30 border border-red-700 p-3 rounded">
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                <p className="text-red-300 text-sm font-semibold">This error is getting fixed as soon as possible.</p>
+              </div>
+              <div className="flex gap-4 justify-end">
+                <button 
+                  onClick={() => setWarningGame(null)}
+                  className="px-6 py-2 rounded-md hover:bg-zinc-800 font-bold transition-colors text-white"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={async () => {
+                    setWarningGame(null);
+                    if (warningGame) {
+                      await actuallyPlayGame(warningGame);
+                    }
+                  }}
+                  className="px-6 py-2 rounded-md bg-green-600 hover:bg-green-500 font-bold transition-colors text-white"
+                >
+                  Continue
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {pendingGameToPlay && (
-          <motion.div initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="fixed inset-0 z-[300] bg-black/80 flex items-center justify-center p-4">
+          <motion.div initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center">
             <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-zinc-900 border border-zinc-800 p-6 rounded-lg max-w-md w-full shadow-2xl">
               <h2 className="text-xl font-bold mb-2">Quick Resume Limit Reached</h2>
               <p className="text-zinc-400 mb-6 text-sm">
@@ -643,7 +764,7 @@ export default function App() {
                   <motion.button 
                     layoutId="guide-button"
                     onClick={() => setIsGuideOpen(true)}
-                    className="z-[260] w-8 h-8 rounded-full bg-green-500 hover:bg-green-400 text-black font-bold flex items-center justify-center shadow-lg transition-transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-green-500/50"
+                    className="z-[260] w-8 h-8 rounded-full bg-green-500 hover:bg-green-400 text-black font-bold flex items-center justify-center shadow-lg transition-transform hover:scale-105"
                   >
                     E
                   </motion.button>
@@ -663,7 +784,7 @@ export default function App() {
                 <div className={playingGame?.id === g.id ? "flex-1 w-full relative bg-white block" : "hidden"} key={g.id}>
                   
                   {localStorage.getItem('anti_deledao') === 'true' && playingGame?.id === g.id && (
-                    <div className="absolute inset-0 pointer-events-none z-[105]" style={{ backgroundImage: 'url(https://upload.wikimedia.org/wikipedia/commons/c/c3/Google_Docs_logo_%282014-2020%29.svg)', opacity: 0.05, backgroundSize: '100px', backgroundRepeat: 'repeat' }} />
+                    <div className="absolute inset-0 pointer-events-none z-[105]" style={{ backgroundImage: 'url(https://upload.wikimedia.org/wikipedia/commons/c/c3/Google_Docs_logo_%282014-2020%29.svg)', backgroundSize: '200px', backgroundPosition: 'center', opacity: 0.03 }} />
                   )}
 
                   <iframe 
@@ -684,35 +805,35 @@ export default function App() {
       <main className="flex-1 min-h-0 overflow-hidden relative z-10 flex flex-col w-full">
         <AnimatePresence mode="wait">
           {currentView === 'home' && (
-            <motion.div key="home" initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="px-12 flex flex-col gap-6 mt-4 flex-1 min-h-0 overflow-y-auto pb-12 w-full justify-center">
+            <motion.div key="home" initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="flex-1 min-h-0 overflow-y-auto px-12 py-8">
               <div className="flex gap-4 shrink-0 overflow-x-auto pb-4 items-center">
-                <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('library')} onClick={() => setCurrentView('library')} className="w-[160px] h-[160px] bg-zinc-800/90 rounded-md flex flex-col justify-center items-center relative overflow-hidden cursor-pointer hover:border-white focus:border-green-500 outline-none border-[3px] border-transparent transition-all shrink-0 group">
+                <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('library')} onClick={() => setCurrentView('library')} className="w-[160px] h-[160px] bg-zinc-800/90 rounded-md cursor-pointer hover:bg-zinc-700 focus:bg-zinc-700 group transition-colors flex flex-col items-center justify-center shrink-0 border-2 border-transparent group-hover:border-green-500 group-focus:border-green-500">
                   <Library className="text-zinc-300 mb-2 group-hover:text-white transition-colors" size={48} />
                   <span className="font-semibold text-sm text-center px-1 text-white">My games & apps</span>
                 </div>
                 
                 {displayGames.slice(0,8).map((g) => (
-                  <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handlePlayGame({id: g.id, title: g.title, file: g.file})} key={g.id} onClick={() => handlePlayGame({id: g.id, title: g.title, file: g.file})} className="w-[160px] h-[160px] bg-zinc-800 rounded-md overflow-hidden border-[3px] border-transparent hover:border-white focus:border-green-500 outline-none cursor-pointer transition-colors group shrink-0 relative">
+                  <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handlePlayGame({id: g.id, title: g.title, file: g.file})} key={g.id} onClick={() => handlePlayGame({id: g.id, title: g.title, file: g.file})} className="w-[160px] h-[160px] bg-zinc-800 rounded-md cursor-pointer group hover:scale-105 focus:scale-105 transition-transform shrink-0 overflow-hidden border-2 border-transparent hover:border-green-500 focus:border-green-500">
                     <img src={g.image} className="w-full h-full object-cover group-hover:scale-105 group-focus:scale-105 transition-transform" />
                   </div>
                 ))}
 
-                <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('settings')} onClick={() => setCurrentView('settings')} className="w-[160px] h-[160px] bg-zinc-800/90 border-[3px] border-transparent hover:border-white focus:border-green-500 outline-none rounded-md flex flex-col justify-center items-center relative cursor-pointer group transition-all shrink-0">
+                <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('settings')} onClick={() => setCurrentView('settings')} className="w-[160px] h-[160px] bg-zinc-800/90 border-2 border-transparent hover:border-green-500 focus:border-green-500 rounded-md cursor-pointer hover:bg-zinc-700 focus:bg-zinc-700 group transition-colors flex flex-col items-center justify-center shrink-0">
                   <Settings size={48} className="text-zinc-300 group-hover:text-white group-focus:text-white transition-colors mb-2" />
                   <span className="font-semibold text-sm text-white">Settings</span>
                 </div>
 
-                <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('friends')} onClick={() => setCurrentView('friends')} className="w-[160px] h-[160px] bg-purple-600 rounded-md flex flex-col justify-center items-center border-[3px] border-transparent hover:border-white focus:border-green-500 outline-none cursor-pointer transition-colors shrink-0">
+                <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('friends')} onClick={() => setCurrentView('friends')} className="w-[160px] h-[160px] bg-purple-600 rounded-md cursor-pointer hover:bg-purple-500 focus:bg-purple-500 group transition-colors flex flex-col items-center justify-center shrink-0 border-2 border-transparent group-hover:border-green-500 group-focus:border-green-500">
                   <Users size={48} className="text-white mb-2" />
                   <span className="font-semibold text-sm text-white">Friends</span>
                 </div>
 
-                <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('activity')} onClick={() => setCurrentView('activity')} className="w-[160px] h-[160px] bg-blue-600 rounded-md flex flex-col justify-center items-center border-[3px] border-transparent hover:border-white focus:border-green-500 outline-none cursor-pointer transition-colors shrink-0 group">
+                <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('activity')} onClick={() => setCurrentView('activity')} className="w-[160px] h-[160px] bg-blue-600 rounded-md cursor-pointer hover:bg-blue-500 focus:bg-blue-500 group transition-colors flex flex-col items-center justify-center shrink-0 border-2 border-transparent group-hover:border-green-500 group-focus:border-green-500">
                   <Flame size={48} className="text-white mb-2 group-hover:text-yellow-400 transition-colors" />
                   <span className="font-semibold text-sm text-white">Activity</span>
                 </div>
 
-                <div tabIndex={0} className="w-[160px] h-[160px] bg-zinc-200 rounded-md flex flex-col justify-center items-center border-[3px] border-transparent hover:border-white focus:border-green-500 outline-none cursor-pointer transition-colors shrink-0 group">
+                <div tabIndex={0} className="w-[160px] h-[160px] bg-zinc-200 rounded-md flex flex-col justify-center items-center border-[3px] border-transparent hover:border-white focus:border-green-500 cursor-not-allowed opacity-50 shrink-0 group">
                   <Store size={48} className="text-zinc-800 mb-2 group-hover:scale-105 transition-transform" />
                   <span className="font-semibold text-sm text-zinc-900">Store</span>
                 </div>
@@ -721,7 +842,7 @@ export default function App() {
           )}
 
           {currentView === 'library' && (
-            <motion.div key="library" initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="px-12 flex flex-col gap-6 pt-4 flex-1 min-h-0 pb-12 w-full">
+            <motion.div key="library" initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="flex-1 min-h-0 overflow-hidden px-12 py-8 flex flex-col">
               <div className="flex items-center gap-4 mb-2 shrink-0">
                 <button onClick={() => setCurrentView('home')} className="p-2 hover:bg-white/10 rounded-full transition-colors -ml-2">
                   <ChevronLeft size={24} />
@@ -746,8 +867,8 @@ export default function App() {
                 <div className="flex-1 overflow-y-auto">
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 pb-12">
                     {displayGames.filter(g => (g as any).type === (libraryTab === 'games' ? 'game' : 'app')).map(item => (
-                      <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handlePlayGame({id: item.id, title: item.title, file: item.file})} key={item.id} onClick={() => handlePlayGame({id: item.id, title: item.title, file: item.file})} className="relative group cursor-pointer flex flex-col focus:outline-none">
-                        <div className="aspect-[3/4] bg-zinc-800 rounded-md overflow-hidden border-[3px] border-transparent group-hover:border-green-500 group-focus:border-green-500 transition-colors shadow-lg">
+                      <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handlePlayGame({id: item.id, title: item.title, file: item.file})} key={item.id} onClick={() => handlePlayGame({id: item.id, title: item.title, file: item.file})} className="group cursor-pointer">
+                        <div className="aspect-[3/4] bg-zinc-800 rounded-md overflow-hidden border-[3px] border-transparent group-hover:border-green-500 group-focus:border-green-500 transition-colors relative">
                           <img src={item.image} className="w-full h-full object-cover group-hover:scale-105 group-focus:scale-105 transition-transform" alt={item.title} />
                           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 group-focus:opacity-100 flex items-center justify-center transition-opacity">
                             <Trophy size={48} className="text-green-500" />
