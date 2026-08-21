@@ -91,36 +91,56 @@ export function Settings({ profile, onBack, onLogout, isGuestMode }: { profile: 
 
 
   // Load cloaking states
-  const [cloakTitle, setCloakTitle] = useState(localStorage.getItem('cloak_title') || '');
-  const [cloakIcon, setCloakIcon] = useState(localStorage.getItem('cloak_icon') || '');
+  const [cloakTitle, setCloakTitle] = useState(localStorage.getItem('cloak_title') || 'Google');
+  const [cloakIcon, setCloakIcon] = useState(localStorage.getItem('cloak_icon') || 'https://www.google.com/favicon.ico');
   const [mobileSizer, setMobileSizer] = useState(localStorage.getItem('mobile_sizer') === 'true');
   const [sortAZ, setSortAZ] = useState(localStorage.getItem('sort_az') === 'true');
   const [antiDeledao, setAntiDeledao] = useState(localStorage.getItem('anti_deledao') === 'true');
   const [autoAboutBlank, setAutoAboutBlank] = useState(localStorage.getItem('auto_about_blank') === 'true');
+  const [notDisturb, setNotDisturb] = useState(localStorage.getItem('not_disturb') === 'true');
+  const [muteNotifications, setMuteNotifications] = useState(localStorage.getItem('mute_notifications') === 'true');
 
   useEffect(() => {
     localStorage.setItem('mobile_sizer', mobileSizer.toString());
     localStorage.setItem('sort_az', sortAZ.toString());
     localStorage.setItem('anti_deledao', antiDeledao.toString());
     localStorage.setItem('auto_about_blank', autoAboutBlank.toString());
-  }, [mobileSizer, sortAZ, antiDeledao, autoAboutBlank]);
+    localStorage.setItem('not_disturb', notDisturb.toString());
+    localStorage.setItem('mute_notifications', muteNotifications.toString());
+  }, [mobileSizer, sortAZ, antiDeledao, autoAboutBlank, notDisturb, muteNotifications]);
+
+  // Set default cloak to Google on first load
+  useEffect(() => {
+    if (!localStorage.getItem('cloak_title')) {
+      localStorage.setItem('cloak_title', 'Google');
+      localStorage.setItem('cloak_icon', 'https://www.google.com/favicon.ico');
+      document.title = 'Google';
+      let link = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.getElementsByTagName('head')[0].appendChild(link);
+      }
+      link.href = 'https://www.google.com/favicon.ico';
+    }
+  }, []);
 
   const applyCloak = (title: string, icon: string) => {
     setCloakTitle(title);
     setCloakIcon(icon);
     localStorage.setItem('cloak_title', title);
     localStorage.setItem('cloak_icon', icon);
-    document.title = title || 'Xbox Dashboard';
+    document.title = title || 'Google';
     let link = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
     if (!link) {
       link = document.createElement('link');
       link.rel = 'icon';
       document.getElementsByTagName('head')[0].appendChild(link);
     }
-    link.href = icon || '/vite.svg';
+    link.href = icon || 'https://www.google.com/favicon.ico';
   };
 
-  const handleResetCloak = () => applyCloak('', '');
+  const handleResetCloak = () => applyCloak('Google', 'https://www.google.com/favicon.ico');
   const handleSetCloakGoogle = () => applyCloak('Google', 'https://www.google.com/favicon.ico');
   const handleSetCloakCanvas = () => applyCloak('Canvas', 'https://du11hjcvx0uqb.cloudfront.net/br/dist/images/favicon-e10d657a73.ico');
 
@@ -159,13 +179,19 @@ export function Settings({ profile, onBack, onLogout, isGuestMode }: { profile: 
                  {num}
                </button>
              ))}
-             <button onClick={() => setShowPinModal(false)} className="w-16 h-16 rounded-full bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-bold flex items-center justify-center transition-colors">Cancel</button>
-             <button onClick={() => pinInput.length < 4 && setPinInput(p => p + '0')} className="w-16 h-16 rounded-full bg-zinc-800 hover:bg-zinc-700 text-white text-2xl font-bold flex items-center justify-center transition-colors">0</button>
-             <button onClick={() => setPinInput(p => p.slice(0, -1))} className="w-16 h-16 rounded-full bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-bold flex items-center justify-center transition-colors">Del</button>
+             <button onClick={() => setShowPinModal(false)} className="w-16 h-16 rounded-full bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-bold flex items-center justify-center transition-colors">
+               Cancel
+             </button>
+             <button onClick={() => pinInput.length < 4 && setPinInput(p => p + '0')} className="w-16 h-16 rounded-full bg-zinc-800 hover:bg-zinc-700 text-white text-2xl font-bold flex items-center justify-center transition-colors">
+               0
+             </button>
+             <button onClick={() => setPinInput(p => p.slice(0, -1))} className="w-16 h-16 rounded-full bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-bold flex items-center justify-center transition-colors">
+               ⌫
+             </button>
           </div>
         </div>
       )}
-    <motion.div key="settings" initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="flex gap-8 px-12 flex-1 min-h-0 pb-12 overflow-y-auto w-full">
+    <motion.div key="settings" initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="flex flex-1 min-h-0 pb-12">
       <div className="w-64 flex flex-col gap-2 shrink-0">
         <div className="flex items-center gap-4 mb-4">
           <button onClick={onBack} className="p-2 hover:bg-white/10 rounded-full transition-colors -ml-4">
@@ -173,8 +199,12 @@ export function Settings({ profile, onBack, onLogout, isGuestMode }: { profile: 
           </button>
           <h2 className="text-2xl font-black">Settings</h2>
         </div>
-        <button onClick={() => setActiveTab('general')} className={`text-left px-4 py-3 rounded-md font-bold transition-colors ${activeTab === 'general' ? 'bg-green-600 text-white' : 'hover:bg-white/10'}`}>General</button>
-        <button onClick={() => setActiveTab('cloak')} className={`text-left px-4 py-3 rounded-md font-bold transition-colors ${activeTab === 'cloak' ? 'bg-green-600 text-white' : 'hover:bg-white/10'}`}>Cloak</button>
+        <button onClick={() => setActiveTab('general')} className={`text-left px-4 py-3 rounded-md font-bold transition-colors ${activeTab === 'general' ? 'bg-green-600 text-white' : 'hover:bg-white/10 text-zinc-400'}`}>
+          General
+        </button>
+        <button onClick={() => setActiveTab('cloak')} className={`text-left px-4 py-3 rounded-md font-bold transition-colors ${activeTab === 'cloak' ? 'bg-green-600 text-white' : 'hover:bg-white/10 text-zinc-400'}`}>
+          Anti-Teacher Mode
+        </button>
         <button onClick={onLogout} className="text-left px-4 py-3 rounded-md font-bold transition-colors bg-red-600 text-white mt-auto mb-4 hover:bg-red-500">
           {isGuestMode ? 'Exit Guest Mode' : 'Sign Out'}
         </button>
@@ -233,6 +263,27 @@ export function Settings({ profile, onBack, onLogout, isGuestMode }: { profile: 
             </div>
 
             <div>
+              <h3 className="text-xl font-bold mb-4">Notifications</h3>
+              <div className="flex flex-col gap-4">
+                <label className="flex items-center justify-between p-4 bg-black/40 rounded-lg cursor-pointer">
+                  <div>
+                    <span className="font-bold">Do Not Disturb While Gaming</span>
+                    <p className="text-xs text-zinc-400">Mute party/message notifications</p>
+                  </div>
+                  <input type="checkbox" checked={notDisturb} onChange={(e) => setNotDisturb(e.target.checked)} className="w-5 h-5 accent-green-500" />
+                </label>
+
+                <label className="flex items-center justify-between p-4 bg-black/40 rounded-lg cursor-pointer">
+                  <div>
+                    <span className="font-bold">Mute All Notifications</span>
+                    <p className="text-xs text-zinc-400">Turn off toast notifications</p>
+                  </div>
+                  <input type="checkbox" checked={muteNotifications} onChange={(e) => setMuteNotifications(e.target.checked)} className="w-5 h-5 accent-green-500" />
+                </label>
+              </div>
+            </div>
+
+            <div>
               <h3 className="text-xl font-bold mb-4">Advanced</h3>
               <div className="flex flex-col gap-4">
                 <label className="flex items-center justify-between p-4 bg-black/40 rounded-lg cursor-pointer">
@@ -263,6 +314,14 @@ export function Settings({ profile, onBack, onLogout, isGuestMode }: { profile: 
 
         {activeTab === 'cloak' && (
           <>
+            <div className="bg-blue-900/20 border border-blue-800 p-4 rounded-lg mb-4">
+              <p className="text-blue-300 text-sm font-semibold">
+                ℹ️ <strong>Google (Default):</strong> Cloaks as Google to bypass filters<br/>
+                ℹ️ <strong>Canvas:</strong> Uses Canvas Learning Management System<br/>
+                ℹ️ <strong>about:blank:</strong> Opens a completely blank window (see below)
+              </p>
+            </div>
+
             <div>
               <h3 className="text-xl font-bold mb-4">about:blank Cloaker</h3>
               <div className="flex flex-col gap-4">
@@ -291,7 +350,7 @@ export function Settings({ profile, onBack, onLogout, isGuestMode }: { profile: 
               <div className="flex gap-2 mb-6">
                 <button onClick={handleSetCloakGoogle} className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-md text-sm font-bold">Google</button>
                 <button onClick={handleSetCloakCanvas} className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-md text-sm font-bold">Canvas</button>
-                <button onClick={handleResetCloak} className="px-4 py-2 bg-red-600/20 text-red-400 hover:bg-red-600/40 rounded-md text-sm font-bold ml-auto">Reset Cloak</button>
+                <button onClick={handleResetCloak} className="px-4 py-2 bg-red-600/20 text-red-400 hover:bg-red-600/40 rounded-md text-sm font-bold ml-auto">Reset to Google</button>
               </div>
 
               <h4 className="font-bold text-sm text-zinc-400 mb-2">Custom Cloak</h4>
