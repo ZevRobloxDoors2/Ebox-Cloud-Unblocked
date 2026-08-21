@@ -173,6 +173,46 @@ export default function App() {
   const [dropboxToast, setDropboxToast] = useState(false);
   const [dropboxSelection, setDropboxSelection] = useState<string>('');
 
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const isDrmEnabled = localStorage.getItem('drm_enabled') !== 'false';
+      if (isDrmEnabled) {
+        document.documentElement.setAttribute('data-drm-enabled', 'true');
+        // Add fake protected video element trick
+        if (!document.getElementById('fake-drm-video')) {
+          const video = document.createElement('video');
+          video.id = 'fake-drm-video';
+          video.style.position = 'fixed';
+          video.style.top = '0';
+          video.style.left = '0';
+          video.style.width = '100%';
+          video.style.height = '100%';
+          video.style.pointerEvents = 'none';
+          video.style.zIndex = '-9999';
+          video.style.opacity = '0.001';
+          video.src = 'https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd';
+          // Not real DRM but some screenshot blockers trigger on video elements or EME requests
+          video.muted = true;
+          document.body.appendChild(video);
+          
+          if (navigator.requestMediaKeySystemAccess) {
+            navigator.requestMediaKeySystemAccess('com.widevine.alpha', [{
+              initDataTypes: ['cenc'],
+              videoCapabilities: [{contentType: 'video/mp4; codecs="avc1.42E01E"'}]
+            }]).catch(() => {});
+          }
+        }
+      } else {
+        document.documentElement.removeAttribute('data-drm-enabled');
+        const video = document.getElementById('fake-drm-video');
+        if (video) video.remove();
+      }
+    };
+    handleStorageChange();
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   const handleDropbox = (choice: string) => {
     if (choice === 'never') {
       localStorage.setItem('dropbox_prompt', 'never');

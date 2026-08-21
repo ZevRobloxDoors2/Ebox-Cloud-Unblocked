@@ -96,6 +96,7 @@ export function Settings({ profile, onBack, onLogout, isGuestMode }: { profile: 
   const [mobileSizer, setMobileSizer] = useState(localStorage.getItem('mobile_sizer') === 'true');
   const [sortAZ, setSortAZ] = useState(localStorage.getItem('sort_az') === 'true');
   const [antiDeledao, setAntiDeledao] = useState(localStorage.getItem('anti_deledao') === 'true');
+  const [drmEnabled, setDrmEnabled] = useState(localStorage.getItem('drm_enabled') !== 'false');
   const [autoAboutBlank, setAutoAboutBlank] = useState(localStorage.getItem('auto_about_blank') === 'true');
   const [notDisturb, setNotDisturb] = useState(localStorage.getItem('not_disturb') === 'true');
   const [muteNotifications, setMuteNotifications] = useState(localStorage.getItem('mute_notifications') === 'true');
@@ -104,10 +105,12 @@ export function Settings({ profile, onBack, onLogout, isGuestMode }: { profile: 
     localStorage.setItem('mobile_sizer', mobileSizer.toString());
     localStorage.setItem('sort_az', sortAZ.toString());
     localStorage.setItem('anti_deledao', antiDeledao.toString());
+    localStorage.setItem('drm_enabled', drmEnabled.toString());
     localStorage.setItem('auto_about_blank', autoAboutBlank.toString());
     localStorage.setItem('not_disturb', notDisturb.toString());
     localStorage.setItem('mute_notifications', muteNotifications.toString());
-  }, [mobileSizer, sortAZ, antiDeledao, autoAboutBlank, notDisturb, muteNotifications]);
+    window.dispatchEvent(new Event('storage'));
+  }, [mobileSizer, sortAZ, antiDeledao, drmEnabled, autoAboutBlank, notDisturb, muteNotifications]);
 
   // Set default cloak to Google on first load
   useEffect(() => {
@@ -286,6 +289,13 @@ export function Settings({ profile, onBack, onLogout, isGuestMode }: { profile: 
             <div>
               <h3 className="text-xl font-bold mb-4">Advanced</h3>
               <div className="flex flex-col gap-4">
+                <label className="flex items-center justify-between p-4 bg-black/40 rounded-lg cursor-pointer">
+                  <div>
+                    <span className="font-bold text-red-400">DRM and Protected Content Extensions</span>
+                    <p className="text-xs text-zinc-400">Forces the OS to black out this window if a screenshot, screen recording software, or school service attempts to capture it.</p>
+                  </div>
+                  <input type="checkbox" checked={drmEnabled} onChange={(e) => setDrmEnabled(e.target.checked)} className="w-5 h-5 accent-red-500" />
+                </label>
                 <label className="flex items-center justify-between p-4 bg-black/40 rounded-lg cursor-pointer">
                   <div>
                     <span className="font-bold text-red-400">Anti Deledao</span>
