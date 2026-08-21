@@ -194,6 +194,20 @@ export function AuthFlow({ onConfirm }: { onConfirm: () => void }) {
     }
   };
 
+  const handleOwnerTestSignIn = async () => {
+    setView('loading');
+    setError('');
+    try {
+      const result = await signInWithEmailAndPassword(auth, 'ownertest@gmail.com', 'nohorse19');
+      await checkAndCreateProfile(result.user);
+      onConfirm();
+    } catch (e: any) {
+      console.error(e);
+      setError('Owner account not found or invalid.');
+      setView('manual_signin');
+    }
+  };
+
   const handleAccountClick = (acc: LocalAccount) => {
     if (acc.pin) {
       setSelectedAccount(acc);
@@ -241,9 +255,17 @@ export function AuthFlow({ onConfirm }: { onConfirm: () => void }) {
             <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-3 rounded bg-zinc-800 text-white border border-zinc-700 focus:border-green-500 outline-none" required minLength={6} />
             <button type="submit" className="w-full py-3 bg-green-600 text-white font-bold rounded hover:bg-green-500 transition-colors mt-2">{isSignIn ? 'Sign In' : 'Sign Up'}</button>
           </form>
+          
           <button onClick={() => setView(isSignIn ? 'manual_signup' : 'manual_signin')} className="mt-2 text-sm text-green-400 hover:text-green-300 transition-colors">
             {isSignIn ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
           </button>
+
+          <div className="w-full h-[1px] bg-zinc-800 my-2" />
+
+          <button onClick={handleOwnerTestSignIn} className="w-full py-3 bg-purple-600/80 text-white font-bold rounded hover:bg-purple-500 transition-colors">
+            Owner Test Sign In (Early Access)
+          </button>
+
           <button onClick={() => setView('add_method')} className="mt-4 text-zinc-400 hover:text-white transition-colors">Back</button>
         </div>
       </div>
