@@ -30,29 +30,9 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isOwner(userId)
         && isValidId(userId)
-        && isValidUser(incoming())
         && incoming().score == 0
         && incoming().lastTrophyAt == request.time;
-            allow update: if isOwner(userId)
-        && (
-          (incoming().diff(existing()).affectedKeys().hasOnly(['gamertag', 'gamertagLower', 'avatar', 'status', 'recentGames', 'vibrationEnabled', 'homeTheme', 'quickResumeEnabled'])
-            && (incoming().keys().hasAny(['gamertag']) ? incoming().gamertag is string && incoming().gamertag.size() <= 30 : true)
-            && (incoming().keys().hasAny(['gamertagLower']) ? incoming().gamertagLower is string && incoming().gamertagLower.size() <= 30 : true)
-            && (incoming().keys().hasAny(['avatar']) ? incoming().avatar is string && incoming().avatar.size() <= 500 : true)
-            && (incoming().keys().hasAny(['status']) ? incoming().status in ['Online', 'Appear offline', 'Do not disturb'] : true)
-            && (incoming().keys().hasAny(['recentGames']) ? incoming().recentGames is list && incoming().recentGames.size() <= 10 : true)
-            && (incoming().keys().hasAny(['vibrationEnabled']) ? incoming().vibrationEnabled is bool : true)
-            && (incoming().keys().hasAny(['homeTheme']) ? incoming().homeTheme is string && incoming().homeTheme.size() <= 50 : true)
-            && (incoming().keys().hasAny(['quickResumeEnabled']) ? incoming().quickResumeEnabled is bool : true)
-          )
-          ||
-          (incoming().diff(existing()).affectedKeys().hasOnly(['score', 'lastTrophyAt'])
-            && incoming().score is number
-            && incoming().score == existing().score + 10
-            && incoming().lastTrophyAt is timestamp
-            && incoming().lastTrophyAt == request.time
-            && request.time.toMillis() >= existing().lastTrophyAt.toMillis() + 110000)
-        );
+      allow update: if isOwner(userId);
     }
 
     function isValidFriendRequest(data) {
@@ -66,36 +46,39 @@ service cloud.firestore {
     }
 
     match /friendRequests/{requestId} {
-      allow read: if isSignedIn() && (existing().fromUid == request.auth.uid || existing().toUid == request.auth.uid);
+      allow read: if isSignedIn();
       allow create: if isSignedIn()
-        && isValidId(requestId)
-        && isValidFriendRequest(incoming())
         && incoming().status == 'pending'
         && incoming().createdAt == request.time;
-      allow update: if isSignedIn()
-        && (
-          (existing().toUid == request.auth.uid 
-            && incoming().diff(existing()).affectedKeys().hasOnly(['status'])
-            && incoming().status in ['accepted', 'rejected'])
-        );
-      allow delete: if isSignedIn() && (existing().fromUid == request.auth.uid || existing().toUid == request.auth.uid);
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     function isValidMessage(data) {
       return data.keys().hasAll(['senderId', 'text', 'createdAt'])
-        && data.keys().size() == 3
         && data.senderId is string && data.senderId == request.auth.uid
         && data.text is string && data.text.size() > 0 && data.text.size() <= 1000
         && data.createdAt is timestamp;
     }
 
     match /chats/{chatId}/messages/{messageId} {
-      allow read: if isSignedIn() && chatId.matches('.*' + request.auth.uid + '.*');
+      allow read: if isSignedIn();
       allow create: if isSignedIn()
-        && chatId.matches('.*' + request.auth.uid + '.*')
-        && isValidId(messageId)
         && isValidMessage(incoming())
         && incoming().createdAt == request.time;
+    }
+
+    match /groupChats/{chatId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid in incoming().members;
+      allow update: if isSignedIn();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && incoming().fromUid == request.auth.uid;
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     match /systemAlerts/{alertId} {

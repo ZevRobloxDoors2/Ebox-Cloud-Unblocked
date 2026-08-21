@@ -23,6 +23,7 @@ import { StartupAnimation } from './components/StartupAnimation';
 import { WelcomeMessage } from './components/WelcomeMessage';
 import { useSpatialNavigation } from './hooks/useSpatialNavigation';
 import { ALL_GAMES } from './games';
+import { GlobalNotifications } from './components/GlobalNotifications';
 
 import { ActivityFeed } from './components/ActivityFeed';
 import { GlobalSearch } from './components/GlobalSearch';
@@ -160,8 +161,7 @@ export default function App() {
     }
   }, []);
   
-  const [chatFriendId, setChatFriendId] = useState('');
-  const [chatFriendGamertag, setChatFriendGamertag] = useState('');
+  const [chatConfig, setChatConfig] = useState<{id: string, name: string, isGroup: boolean} | null>(null);
   
   // Playing state
   const [playingGame, setPlayingGame] = useState<{ id: string, title: string, file: string } | null>(null);
@@ -469,6 +469,7 @@ export default function App() {
   return (
     <>
       <DMCAModal />
+      <GlobalNotifications profile={activeProfile} playingGame={!!playingGame} onNavigateToChat={(id, isGroup, name) => { setChatConfig({id, name, isGroup}); setCurrentView('chat'); }} onNavigateToParty={() => setCurrentView('party')} />
       <div className={`h-screen ${getThemeClasses(activeProfile.homeTheme)} text-white font-sans overflow-hidden flex flex-col relative z-0`}>
         <WelcomeMessage />
         <div className="fixed inset-0 z-[-1] opacity-50">
@@ -911,12 +912,12 @@ export default function App() {
 
             {currentView === 'profile' && <Profile key="profile" userProfile={activeProfile} onBack={() => setCurrentView('home')} />}
             
-            {currentView === 'friends' && <Friends key="friends" userProfile={activeProfile} onBack={() => setCurrentView('home')} onChat={(fId, fTag) => { setChatFriendId(fId); setChatFriendGamertag(fTag); setCurrentView('chat'); }} />}
+            {currentView === 'friends' && <Friends key="friends" userProfile={activeProfile} onBack={() => setCurrentView('home')} onChat={(id, name, isGroup) => { setChatConfig({id, name, isGroup: !!isGroup}); setCurrentView('chat'); }} />}
             
             {currentView === 'notifications' && <Notifications key="notifications" userProfile={activeProfile} onBack={() => setCurrentView('home')} />}
             {currentView === 'party' && <Party key="party" profile={activeProfile} onBack={() => setCurrentView('home')} />}
             {currentView === 'activity' && <ActivityFeed key="activity" />}
-            {currentView === 'chat' && <Chat key="chat" userProfile={activeProfile} friendId={chatFriendId} friendGamertag={chatFriendGamertag} onBack={() => setCurrentView('friends')} />}
+            {currentView === 'chat' && chatConfig && <Chat key="chat" userProfile={activeProfile} friendId={!chatConfig.isGroup ? chatConfig.id : undefined} friendGamertag={!chatConfig.isGroup ? chatConfig.name : undefined} chatId={chatConfig.isGroup ? chatConfig.id : undefined} isGroup={chatConfig.isGroup} chatName={chatConfig.isGroup ? chatConfig.name : undefined} onBack={() => setCurrentView('friends')} />}
 
             {currentView === 'settings' && <SettingsView profile={activeProfile as any} onBack={() => setCurrentView('home')} onLogout={handleLogout} isGuestMode={isGuestMode} />}
           </AnimatePresence>

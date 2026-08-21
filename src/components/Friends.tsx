@@ -9,7 +9,7 @@ interface FriendsProps {
   key?: string;
   userProfile: UserProfile;
   onBack: () => void;
-  onChat: (friendId: string, friendGamertag: string) => void;
+  onChat: (id: string, name: string, isGroup?: boolean) => void;
 }
 
 // Fuzzy search helper
@@ -34,6 +34,7 @@ export function Friends({ userProfile, onBack, onChat }: FriendsProps) {
   
   const [friends, setFriends] = useState<{uid: string, gamertag: string}[]>([]);
   const [searchResults, setSearchResults] = useState<{uid: string, gamertag: string}[]>([]);
+  const [groupChats, setGroupChats] = useState<{id: string, name: string}[]>([]);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -67,6 +68,15 @@ export function Friends({ userProfile, onBack, onChat }: FriendsProps) {
     }, (err) => console.error(err));
 
     return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!auth.currentUser) return;
+    const q = query(collection(db, 'groupChats'), where('members', 'array-contains', auth.currentUser.uid));
+    const unsub = onSnapshot(q, (snap) => {
+      setGroupChats(snap.docs.map(d => ({ id: d.id, name: d.data().name })));
+    });
+    return () => unsub();
   }, []);
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -239,7 +249,32 @@ export function Friends({ userProfile, onBack, onChat }: FriendsProps) {
                 <div key={f.uid} className="bg-zinc-900 p-4 rounded-md flex items-center justify-between group hover:bg-zinc-800 transition-colors">
                   <span className="font-semibold">{f.gamertag}</span>
                   <button 
-                    onClick={() => onChat(f.uid, f.gamertag)} 
+                    onClick={() => onChat(f.uid, f.gamertag, false)} 
+                    className="bg-zinc-700 hover:bg-zinc-600 text-white p-2 rounded-full transition-colors opacity-0 group-hover:opacity-100"
+                    title="Message"
+                  >
+                    <MessageSquare size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        {/* Group Chats List */}
+        <div className="bg-zinc-800/80 p-6 rounded-lg border border-transparent hover:border-white/10 transition-colors">
+          <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <Users size={20} className="text-purple-400" /> My Group Chats ({groupChats.length})
+          </h3>
+          {groupChats.length === 0 ? (
+            <p className="text-zinc-400 text-sm">You aren't in any group chats yet. Create one above!</p>
+          ) : (
+            <div className="flex flex-col gap-3 max-h-96 overflow-y-auto">
+              {groupChats.map(gc => (
+                <div key={gc.id} className="bg-zinc-900 p-4 rounded-md flex items-center justify-between group hover:bg-zinc-800 transition-colors">
+                  <span className="font-semibold">{gc.name}</span>
+                  <button 
+                    onClick={() => onChat(gc.id, gc.name, true)} 
                     className="bg-zinc-700 hover:bg-zinc-600 text-white p-2 rounded-full transition-colors opacity-0 group-hover:opacity-100"
                     title="Message"
                   >

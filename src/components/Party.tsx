@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { ChevronLeft, Users, Mic, MicOff, PhoneOff } from 'lucide-react';
 import { db } from '../firebase';
-import { doc, onSnapshot, updateDoc, setDoc, deleteDoc, collection, serverTimestamp, addDoc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, setDoc, deleteDoc, collection, serverTimestamp, addDoc, getDoc, query, or, where } from 'firebase/firestore';
 
 const servers = {
   iceServers: [
@@ -16,27 +16,52 @@ export const Party: React.FC<{ profile: any, onBack: () => void }> = ({ profile,
   const [partyMembers, setPartyMembers] = useState<any[]>([]);
   const [isMuted, setIsMuted] = useState(false);
   const [micPermissionGranted, setMicPermissionGranted] = useState(false);
+  const [inParty, setInParty] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [friendsList, setFriendsList] = useState<any[]>([]);
   const [micError, setMicError] = useState('');
   const localStream = useRef<MediaStream | null>(null);
   const peers = useRef<Record<string, RTCPeerConnection>>({});
   const partyId = 'global-party';
 
   useEffect(() => {
-    if (!micPermissionGranted) return;
+    // Always listen to party members
+    const membersQuery = collection(db, 'parties', partyId, 'members');
+    const unsub = onSnapshot(membersQuery, (snap) => {
+      const members: any[] = [];
+      snap.forEach(d => members.push({ id: d.id, ...d.data() }));
+      setPartyMembers(members);
+      
+      // If we are in the party, connect to new members
+      if (inParty) {
+        members.forEach(m => {
+          if (m.id !== profile.uid && !peers.current[m.id] && m.id > profile.uid) {
+             connectToPeer(m.id);
+          }
+        });
+      }
+    });
+    return () => unsub();
+  }, [inParty, profile.uid]);
+
+  useEffect(() => {
+    if (!inParty) return;
 
     let unsubs: (() => void)[] = [];
     const init = async () => {
       // 1. Log activity
-      await addDoc(collection(db, 'activities'), {
-        type: 'party',
-        uid: profile.uid,
-        gamertag: profile.gamertag,
-        avatar: profile.avatar || '',
-        details: 'Joined a party',
-        createdAt: serverTimestamp()
-      });
+      try {
+        await addDoc(collection(db, 'activities'), {
+          type: 'party',
+          uid: profile.uid,
+          gamertag: profile.gamertag,
+          avatar: profile.avatar || '',
+          details: 'Joined a party',
+          createdAt: serverTimestamp()
+        });
+      } catch (e) { console.error("Party activity error", e); }
 
-      // 2. Get local audio (already granted from the screen, just retrieving)
+      // 2. Get local audio
       try {
         localStream.current = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
       } catch(e) {
@@ -53,22 +78,7 @@ export const Party: React.FC<{ profile: any, onBack: () => void }> = ({ profile,
         joinedAt: serverTimestamp()
       });
 
-      // 4. Listen to members
-      const membersQuery = collection(db, 'parties', partyId, 'members');
-      unsubs.push(onSnapshot(membersQuery, (snap) => {
-        const members: any[] = [];
-        snap.forEach(d => members.push({ id: d.id, ...d.data() }));
-        setPartyMembers(members);
-        
-        // Connect to new members (we initiate if their uid > our uid, to prevent double offers)
-        members.forEach(m => {
-          if (m.id !== profile.uid && !peers.current[m.id] && m.id > profile.uid) {
-             connectToPeer(m.id);
-          }
-        });
-      }));
-
-      // 5. Listen to signals sent to US
+      // 4. Listen to signals sent to US
       const signalsRef = collection(db, 'parties', partyId, 'members', profile.uid, 'signals');
       unsubs.push(onSnapshot(signalsRef, (snap) => {
         snap.docChanges().forEach(change => {
@@ -98,41 +108,17 @@ export const Party: React.FC<{ profile: any, onBack: () => void }> = ({ profile,
       unsubs.forEach(u => u());
       window.removeEventListener('beforeunload', leaveParty);
     };
-  }, [profile.uid, micPermissionGranted]);
+  }, [inParty, profile.uid]);
 
-  const requestMic = async () => {
+  const joinParty = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // We got it, we can stop this temporary stream and let the effect pick it up
       stream.getTracks().forEach(t => t.stop());
-      setMicPermissionGranted(true);
+      setInParty(true);
     } catch(e) {
       setMicError('Microphone access denied. Please allow microphone access to join the party.');
     }
   };
-
-  if (!micPermissionGranted) {
-    return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="px-12 max-w-4xl mx-auto flex flex-col pt-8 pb-12 h-full justify-center items-center w-full">
-        <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mb-6">
-          <Mic className="text-blue-500" size={32} />
-        </div>
-        <h2 className="text-2xl font-bold mb-4">Allow Microphone Access</h2>
-        <p className="text-zinc-400 text-center mb-8 max-w-md">
-          To chat with your friends in the party, you need to allow microphone access.
-        </p>
-        {micError && <p className="text-red-500 mb-6 font-semibold">{micError}</p>}
-        <div className="flex gap-4">
-          <button onClick={onBack} className="px-6 py-3 rounded-full border border-white/20 hover:bg-white/10 font-bold transition-colors">
-            Cancel
-          </button>
-          <button onClick={requestMic} className="px-6 py-3 rounded-full bg-blue-600 hover:bg-blue-500 font-bold transition-colors shadow-lg shadow-blue-900/20">
-            Allow Microphone
-          </button>
-        </div>
-      </motion.div>
-    );
-  }
 
   const connectToPeer = async (peerId: string) => {
     const pc = new RTCPeerConnection(servers);
@@ -224,6 +210,50 @@ export const Party: React.FC<{ profile: any, onBack: () => void }> = ({ profile,
     setIsMuted(!isMuted);
   };
 
+  useEffect(() => {
+    if (!showInviteModal) return;
+    const q = query(
+      collection(db, 'friendRequests'),
+      or(
+        where('fromUid', '==', profile.uid),
+        where('toUid', '==', profile.uid)
+      )
+    );
+    const unsub = onSnapshot(q, async (snap) => {
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const accepted = data.filter(r => (r as any).status === 'accepted');
+      const list: any[] = [];
+      
+      for (const r of accepted as any[]) {
+        if (r.fromUid === profile.uid) {
+          const userDoc = await getDoc(doc(db, 'users', r.toUid));
+          if (userDoc.exists()) list.push({ uid: r.toUid, gamertag: userDoc.data().gamertag, avatar: userDoc.data().avatar });
+        } else {
+          list.push({ uid: r.fromUid, gamertag: r.fromGamertag });
+        }
+      }
+      setFriendsList(list);
+    });
+    return () => unsub();
+  }, [showInviteModal, profile.uid]);
+
+  const sendInvite = async (fUid: string) => {
+    try {
+      await addDoc(collection(db, 'notifications'), {
+        toUid: fUid,
+        fromUid: profile.uid,
+        fromGamertag: profile.gamertag,
+        type: 'party_invite',
+        partyId: partyId,
+        read: false,
+        createdAt: serverTimestamp()
+      });
+      alert('Invite sent!');
+    } catch(e) {
+      console.error(e);
+    }
+  };
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="px-12 max-w-4xl mx-auto flex flex-col pt-8 pb-12 h-full overflow-y-auto w-full">
       <div className="flex items-center justify-between border-b border-white/10 pb-4 shrink-0">
@@ -237,33 +267,39 @@ export const Party: React.FC<{ profile: any, onBack: () => void }> = ({ profile,
             </div>
             <div>
               <h2 className="text-2xl font-bold">Party</h2>
-              <span className="text-sm text-green-500">Voice chat active</span>
+              <span className="text-sm text-green-500">{partyMembers.length} Members</span>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white font-semibold rounded-md transition-colors text-sm">
-            Invite Friends
+        
+        {inParty ? (
+          <div className="flex items-center gap-3">
+            <button onClick={() => setShowInviteModal(true)} className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white font-semibold rounded-md transition-colors text-sm">
+              Invite Friends
+            </button>
+            <div className="w-px h-6 bg-white/20 mx-2"></div>
+            <button 
+              onClick={toggleMute}
+              className={`p-3 rounded-full flex items-center justify-center transition-colors focus:ring-2 focus:ring-white focus:outline-none ${isMuted ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30' : 'bg-zinc-800 text-white hover:bg-zinc-700'}`}
+            >
+              {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
+            </button>
+            <button 
+              onClick={() => setInParty(false)}
+              className="p-3 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white transition-colors focus:ring-2 focus:ring-white focus:outline-none"
+            >
+              <PhoneOff size={20} />
+            </button>
+          </div>
+        ) : (
+          <button onClick={joinParty} className="px-6 py-2 rounded-full bg-blue-600 hover:bg-blue-500 font-bold transition-colors shadow-lg shadow-blue-900/20">
+            Join Party
           </button>
-          <select className="bg-zinc-800 border-none outline-none text-sm font-semibold px-3 py-2 rounded-md text-zinc-300">
-            <option value="invite_only">Invite Only</option>
-            <option value="public">Public</option>
-          </select>
-          <div className="w-px h-6 bg-white/20 mx-2"></div>
-          <button 
-            onClick={toggleMute}
-            className={`p-3 rounded-full flex items-center justify-center transition-colors focus:ring-2 focus:ring-white focus:outline-none ${isMuted ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30' : 'bg-zinc-800 text-white hover:bg-zinc-700'}`}
-          >
-            {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
-          </button>
-          <button 
-            onClick={onBack}
-            className="p-3 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white transition-colors focus:ring-2 focus:ring-white focus:outline-none"
-          >
-            <PhoneOff size={20} />
-          </button>
-        </div>
+        )}
       </div>
+      
+      {micError && !inParty && <p className="text-red-500 mt-4 font-semibold text-center">{micError}</p>}
+
       <div className="flex flex-col gap-4 mt-8">
         {partyMembers.map((member) => (
           <div key={member.id} className="bg-zinc-900/50 border border-white/5 rounded-xl p-4 flex items-center justify-between">
@@ -290,7 +326,40 @@ export const Party: React.FC<{ profile: any, onBack: () => void }> = ({ profile,
             </div>
           </div>
         ))}
+        {partyMembers.length === 0 && (
+          <div className="text-center text-zinc-500 py-12">
+            No one is in the party right now.
+          </div>
+        )}
       </div>
+
+      {showInviteModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-md shadow-2xl">
+            <h3 className="text-2xl font-bold mb-4">Invite Friends to Party</h3>
+            <div className="flex flex-col gap-3 max-h-64 overflow-y-auto pr-2 custom-scroll mb-6">
+              {friendsList.length === 0 ? (
+                <p className="text-zinc-500 text-center py-4">You have no friends to invite.</p>
+              ) : (
+                friendsList.map(f => (
+                  <div key={f.uid} className="flex items-center justify-between bg-zinc-800 p-3 rounded-md">
+                    <span className="font-semibold text-white">{f.gamertag}</span>
+                    <button 
+                      onClick={() => sendInvite(f.uid)}
+                      className="bg-green-600 hover:bg-green-500 text-white px-4 py-1.5 rounded-md text-sm font-bold transition-colors"
+                    >
+                      Invite
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+            <button onClick={() => setShowInviteModal(false)} className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-3 rounded-md transition-colors">
+              Close
+            </button>
+          </motion.div>
+        </div>
+      )}
     </motion.div>
   );
 }
