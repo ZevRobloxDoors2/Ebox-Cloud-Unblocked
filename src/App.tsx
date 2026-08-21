@@ -254,7 +254,8 @@ export default function App() {
       return file;
     }
     const basePath = getBasePath();
-    return `${basePath}/public/${file}`;
+    const cleanFile = file.startsWith('/') ? file : `/${file}`;
+    return `${basePath}${cleanFile}`;
   };
 
   const actuallyPlayGame = async (game: {id: string, title: string, file: string}) => {
