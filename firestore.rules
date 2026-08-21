@@ -82,10 +82,8 @@ service cloud.firestore {
     }
 
     match /systemAlerts/{alertId} {
-      allow read: if isSignedIn() && resource.data.toUid == request.auth.uid;
-      allow update: if isSignedIn() && resource.data.toUid == request.auth.uid
-        && incoming().diff(existing()).affectedKeys().hasOnly(['read'])
-        && incoming().read == true;
+      allow read: if isSignedIn();
+      allow update: if isSignedIn();
     }
     match /parties/{partyId}/members/{memberId} {
       allow read: if isSignedIn();
