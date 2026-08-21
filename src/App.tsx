@@ -95,7 +95,20 @@ export default function App() {
       setSortAZ(localStorage.getItem('sort_az') === 'true');
       setMobileSizer(localStorage.getItem('mobile_sizer') === 'true');
     }, 500);
-    return () => clearInterval(i);
+    
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => style.remove();
+  }, []);
+
+  return () => clearInterval(i);
   }, []);
 
   useSpatialNavigation();
@@ -156,6 +169,45 @@ export default function App() {
   const [playMinutes, setPlayMinutes] = useState(0);
   const [suspendedGames, setSuspendedGames] = useState<{game: {id: string, title: string, file: string}, minutes: number}[]>([]);
   const [pendingGameToPlay, setPendingGameToPlay] = useState<{id: string, title: string, file: string} | null>(null);
+  const [warningGame, setWarningGame] = useState<{id: string, title: string, file: string} | null>(null);
+  const [showDropboxPrompt, setShowDropboxPrompt] = useState(
+    !localStorage.getItem('dropbox_prompt') && window.location !== window.parent.location === false
+  );
+  const [dropboxToast, setDropboxToast] = useState(false);
+
+  const handleDropbox = (choice: string) => {
+    if (choice === 'never') {
+      localStorage.setItem('dropbox_prompt', 'never');
+      setShowDropboxPrompt(false);
+      setDropboxToast(true);
+      setTimeout(() => setDropboxToast(false), 3000);
+    } else if (choice === 'always') {
+      localStorage.setItem('dropbox_prompt', 'always');
+      setShowDropboxPrompt(false);
+      // Automatically apply cloak or redirect if needed?
+      applyDropboxCloak();
+    } else {
+      setShowDropboxPrompt(false);
+    }
+  };
+
+  const applyDropboxCloak = () => {
+    // Just simple about:blank cloak for now since the options are listed in text
+    let win = window.open();
+    if (win) {
+      win.document.body.style.margin = '0';
+      win.document.body.style.height = '100vh';
+      let iframe = win.document.createElement('iframe');
+      iframe.style.border = 'none';
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.margin = '0';
+      iframe.src = window.location.href;
+      win.document.body.appendChild(iframe);
+      window.location.replace("https://google.com");
+    }
+  };
+
 
   const [isLoadingGame, setIsLoadingGame] = useState(false);
   const [showTrophyToast, setShowTrophyToast] = useState(false);
@@ -226,6 +278,11 @@ export default function App() {
   };
 
   const handlePlayGame = async (game: {id: string, title: string, file: string}) => {
+    if (game.id === 'Roblox' || game.id === 'TikTok') {
+      setWarningGame(game);
+      return;
+    }
+
     if (profile?.quickResumeEnabled && suspendedGames.length >= 6 && !suspendedGames.find(s => s.game.id === game.id)) {
       setPendingGameToPlay(game);
       return;
