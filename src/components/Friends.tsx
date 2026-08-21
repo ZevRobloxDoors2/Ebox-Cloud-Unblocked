@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ChevronLeft, UserPlus, User, MessageSquare } from 'lucide-react';
+import { ChevronLeft, UserPlus, User, MessageSquare, Users } from 'lucide-react';
 import { UserProfile, FriendRequest } from '../types';
 import { db, auth } from '../firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, onSnapshot, or, serverTimestamp } from 'firebase/firestore';
@@ -12,11 +12,28 @@ interface FriendsProps {
   onChat: (friendId: string, friendGamertag: string) => void;
 }
 
+// Fuzzy search helper
+const fuzzyMatch = (searchTerm: string, target: string): boolean => {
+  const search = searchTerm.toLowerCase();
+  const haystack = target.toLowerCase();
+  let searchIdx = 0;
+  
+  for (let i = 0; i < haystack.length && searchIdx < search.length; i++) {
+    if (haystack[i] === search[searchIdx]) {
+      searchIdx++;
+    }
+  }
+  return searchIdx === search.length;
+};
+
 export function Friends({ userProfile, onBack, onChat }: FriendsProps) {
   const [searchTag, setSearchTag] = useState('');
   const [searching, setSearching] = useState(false);
+  const [showCreateGC, setShowCreateGC] = useState(false);
+  const [gcName, setGcName] = useState('');
   
   const [friends, setFriends] = useState<{uid: string, gamertag: string}[]>([]);
+  const [searchResults, setSearchResults] = useState<{uid: string, gamertag: string}[]>([]);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -28,17 +45,24 @@ export function Friends({ userProfile, onBack, onChat }: FriendsProps) {
       )
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
       const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as FriendRequest));
       
       // Compute friends
       const accepted = data.filter(r => r.status === 'accepted');
-      const friendList = accepted.map(r => {
-        if (r.fromUid === auth.currentUser!.uid) return { uid: r.toUid, gamertag: 'Friend' }; // We'd ideally fetch their gamertag, but for simplicity
-        return { uid: r.fromUid, gamertag: r.fromGamertag };
-      });
-      // To properly get gamertags, we should really just store them in the request or fetch them.
-      // We have fromGamertag, but not toGamertag. Let's just fetch the user profile if needed, or just show ID.
+      const friendList: {uid: string, gamertag: string}[] = [];
+      
+      for (const r of accepted) {
+        if (r.fromUid === auth.currentUser!.uid) {
+          // Fetch to user's gamertag
+          const userDoc = await getDocs(query(collection(db, 'users'), where('uid', '==', r.toUid)));
+          if (!userDoc.empty) {
+            friendList.push({ uid: r.toUid, gamertag: (userDoc.docs[0].data() as UserProfile).gamertag });
+          }
+        } else {
+          friendList.push({ uid: r.fromUid, gamertag: r.fromGamertag });
+        }
+      }
       setFriends(friendList);
     }, (err) => console.error(err));
 
@@ -50,33 +74,75 @@ export function Friends({ userProfile, onBack, onChat }: FriendsProps) {
     if (!searchTag.trim()) return;
     setSearching(true);
     try {
-      const q = query(collection(db, 'users'), where('gamertagLower', '==', searchTag.trim().toLowerCase()));
+      // Fuzzy search - get users and filter with fuzzy match
+      const q = query(collection(db, 'users'));
       const snap = await getDocs(q);
-      if (snap.empty) {
+      
+      const matches = snap.docs
+        .map(d => ({ uid: d.id, ...(d.data() as UserProfile) }))
+        .filter(u => 
+          fuzzyMatch(searchTag.trim(), u.gamertag) && 
+          u.uid !== userProfile.uid
+        )
+        .sort((a, b) => {
+          // Sort by how close the match is (shorter distance = better match)
+          const aLen = a.gamertag.length;
+          const bLen = b.gamertag.length;
+          return aLen - bLen;
+        })
+        .slice(0, 10); // Limit to top 10 results
+
+      if (matches.length === 0) {
         alert("Player not found.");
+        setSearchResults([]);
       } else {
-        const foundUser = snap.docs[0].data() as UserProfile;
-        if (foundUser.uid === userProfile.uid) {
-          alert("That's you!");
-          return;
-        }
-        
-        // Send request
-        await addDoc(collection(db, 'friendRequests'), {
-          fromUid: userProfile.uid,
-          fromGamertag: userProfile.gamertag,
-          toUid: foundUser.uid,
-          status: 'pending',
-          createdAt: serverTimestamp()
-        });
-        alert(`Friend request sent to ${foundUser.gamertag}!`);
-        setSearchTag('');
+        setSearchResults(matches.map(u => ({ uid: u.uid, gamertag: u.gamertag })));
       }
     } catch(e: any) {
       console.error(e);
       alert("Error: " + e.message);
     } finally {
       setSearching(false);
+    }
+  };
+
+  const handleSendRequest = async (targetUid: string, targetGamertag: string) => {
+    try {
+      await addDoc(collection(db, 'friendRequests'), {
+        fromUid: userProfile.uid,
+        fromGamertag: userProfile.gamertag,
+        toUid: targetUid,
+        status: 'pending',
+        createdAt: serverTimestamp()
+      });
+      alert(`Friend request sent to ${targetGamertag}!`);
+      setSearchTag('');
+      setSearchResults([]);
+    } catch(e: any) {
+      console.error(e);
+      alert("Error: " + e.message);
+    }
+  };
+
+  const handleCreateGroupChat = async () => {
+    if (!gcName.trim()) {
+      alert("Please enter a group chat name");
+      return;
+    }
+    try {
+      await addDoc(collection(db, 'groupChats'), {
+        name: gcName,
+        createdBy: userProfile.uid,
+        createdByGamertag: userProfile.gamertag,
+        members: [userProfile.uid],
+        createdAt: serverTimestamp()
+      });
+      alert(`Group chat "${gcName}" created!`);
+      setGcName('');
+      setShowCreateGC(false);
+    } catch(e: any) {
+      console.error(e);
+      alert("Error: " + e.message);
     }
   };
 
@@ -101,32 +167,81 @@ export function Friends({ userProfile, onBack, onChat }: FriendsProps) {
                 type="text"
                 value={searchTag}
                 onChange={(e) => setSearchTag(e.target.value)}
-                placeholder="Enter Gamertag to search..."
+                placeholder="Search gamertag (fuzzy match)..."
                 className="bg-zinc-900 border border-zinc-700 px-4 py-3 rounded-md text-white focus:outline-none focus:border-green-500 font-medium"
               />
-              <button disabled={searching} type="submit" className="bg-green-600 hover:bg-green-500 disabled:opacity-50 font-bold py-3 rounded-md transition-colors text-sm uppercase tracking-wide flex justify-center">
-                {searching ? 'Searching...' : 'Send Request'}
+              <button disabled={searching} type="submit" className="bg-green-600 hover:bg-green-500 disabled:opacity-50 font-bold py-3 rounded-md transition-colors text-sm uppercase tracking-wide">
+                {searching ? 'Searching...' : 'Search Players'}
               </button>
             </form>
+            
+            {/* Search Results */}
+            {searchResults.length > 0 && (
+              <div className="mt-4 flex flex-col gap-2 max-h-64 overflow-y-auto">
+                <p className="text-xs text-zinc-400 font-semibold">Search Results:</p>
+                {searchResults.map(result => (
+                  <div key={result.uid} className="bg-zinc-900 p-3 rounded-md flex items-center justify-between">
+                    <span className="font-semibold text-sm">{result.gamertag}</span>
+                    <button 
+                      onClick={() => handleSendRequest(result.uid, result.gamertag)}
+                      className="bg-green-600 hover:bg-green-500 px-3 py-1 rounded-md text-xs font-bold transition-colors"
+                    >
+                      Add
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Create Group Chat */}
+          <div className="bg-zinc-800/80 p-6 rounded-lg border border-transparent hover:border-white/10 transition-colors">
+            <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <Users size={20} className="text-purple-400" /> Group Chats
+            </h3>
+            <button 
+              onClick={() => setShowCreateGC(!showCreateGC)}
+              className="w-full bg-purple-600 hover:bg-purple-500 font-bold py-2 rounded-md transition-colors text-sm"
+            >
+              {showCreateGC ? 'Cancel' : 'Create Group Chat'}
+            </button>
+            
+            {showCreateGC && (
+              <div className="mt-4 flex flex-col gap-3">
+                <input 
+                  type="text"
+                  value={gcName}
+                  onChange={(e) => setGcName(e.target.value)}
+                  placeholder="Group chat name..."
+                  className="bg-zinc-900 border border-zinc-700 px-4 py-2 rounded-md text-white focus:outline-none focus:border-purple-500"
+                />
+                <button 
+                  onClick={handleCreateGroupChat}
+                  className="bg-purple-600 hover:bg-purple-500 font-bold py-2 rounded-md transition-colors text-sm"
+                >
+                  Create
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Friend List */}
         <div className="bg-zinc-800/80 p-6 rounded-lg border border-transparent hover:border-white/10 transition-colors">
           <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <User size={20} className="text-blue-400" /> My Friends
+            <User size={20} className="text-blue-400" /> My Friends ({friends.length})
           </h3>
           {friends.length === 0 ? (
-            <p className="text-zinc-400 text-sm">You haven't added any friends yet.</p>
+            <p className="text-zinc-400 text-sm">You haven't added any friends yet. Search for friends using the search above!</p>
           ) : (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 max-h-96 overflow-y-auto">
               {friends.map(f => (
-                <div key={f.uid} className="bg-zinc-900 p-4 rounded-md flex items-center justify-between group">
-                  <span className="font-semibold">{f.gamertag === 'Friend' ? f.uid.substring(0,8) + '...' : f.gamertag}</span>
+                <div key={f.uid} className="bg-zinc-900 p-4 rounded-md flex items-center justify-between group hover:bg-zinc-800 transition-colors">
+                  <span className="font-semibold">{f.gamertag}</span>
                   <button 
                     onClick={() => onChat(f.uid, f.gamertag)} 
                     className="bg-zinc-700 hover:bg-zinc-600 text-white p-2 rounded-full transition-colors opacity-0 group-hover:opacity-100"
-                    title="Chat"
+                    title="Message"
                   >
                     <MessageSquare size={16} />
                   </button>
