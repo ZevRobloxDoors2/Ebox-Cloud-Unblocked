@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Settings, Home, Library, Users, Bell, Headphones, Trophy, Store, ChevronLeft, Flame, Search,
-  Battery, BatteryCharging, BatteryFull, BatteryLow, BatteryMedium
+  Battery, BatteryCharging, BatteryFull, BatteryLow, BatteryMedium, ChevronDown
 } from 'lucide-react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, onSnapshot, updateDoc, serverTimestamp, collection, query, where, increment, addDoc } from 'firebase/firestore';
@@ -171,6 +171,7 @@ export default function App() {
   const [warningGame, setWarningGame] = useState<{id: string, title: string, file: string} | null>(null);
   const [showDropboxPrompt, setShowDropboxPrompt] = useState(true);
   const [dropboxToast, setDropboxToast] = useState(false);
+  const [dropboxSelection, setDropboxSelection] = useState<string>('');
 
   const handleDropbox = (choice: string) => {
     if (choice === 'never') {
@@ -181,7 +182,6 @@ export default function App() {
     } else if (choice === 'always') {
       localStorage.setItem('dropbox_prompt', 'always');
       setShowDropboxPrompt(false);
-      // Automatically apply cloak or redirect if needed?
       applyDropboxCloak();
     } else {
       setShowDropboxPrompt(false);
@@ -431,7 +431,7 @@ export default function App() {
         <AuthFlow onConfirm={() => setActiveSessionConfirmed(true)} />
         <WelcomeMessage />
         <DMCAModal />
-      <GlobalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} onNavigate={(v) => setCurrentView(v as any)} onPlayGame={handlePlayGame} />
+        <GlobalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} onNavigate={(v) => setCurrentView(v as any)} onPlayGame={handlePlayGame} />
       </>
     );
   }
@@ -457,447 +457,459 @@ export default function App() {
   return (
     <>
       <DMCAModal />
-      <div className={`h-screen ${getThemeClasses(activeProfile.homeTheme)} text-white font-sans overflow-hidden flex flex-col relative z-0`} style={mobileSizer ? { transform: 'scale(0.8)', transformOrigin: 'top left', width: '125%', height: '125%' } : {}}>
-      <WelcomeMessage />
-      <div className="fixed inset-0 z-[-1] opacity-50">
-        <div className="absolute inset-0 bg-gradient-to-tr from-black/80 via-transparent to-black/40" />
-      </div>
-
-      {!playingGame && (
-        <motion.button 
-          layoutId="guide-button"
-          onClick={() => setIsGuideOpen(true)}
-          className="fixed top-8 right-8 z-[260] w-12 h-12 rounded-full bg-green-500 hover:bg-green-400 text-black font-bold text-xl flex items-center justify-center shadow-lg transition-transform hover:scale-105"
-        >
-          E
-        </motion.button>
-      )}
-
-      <EboxMusicToast />
-      <GuideMenu 
-        isOpen={isGuideOpen} 
-        onClose={() => setIsGuideOpen(false)} 
-        recentGames={activeProfile.recentGames || []}
-        onNavigate={(view) => {
-          if (playingGame && view !== 'home') {
-             setPlayingGame(null); // Optionally exit game when navigating away
-          }
-          setCurrentView(view as View);
-        }}
-      />
-
-      <AnimatePresence>
-        {showDropboxPrompt && !playingGame && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-sm flex items-center justify-center"
-          >
-            <motion.div 
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
-              className="bg-zinc-900 border-2 border-yellow-500 p-8 rounded-lg max-w-2xl w-full shadow-2xl mx-4"
-            >
-              <h2 className="text-2xl font-bold mb-4 text-yellow-400">🚀 Anti-Teacher Mode</h2>
-              <p className="text-zinc-300 mb-6 text-lg leading-relaxed">
-                Do you want to go in DROPBOX?
-              </p>
-              <div className="space-y-3 mb-8 bg-zinc-800/50 p-4 rounded border border-zinc-700">
-                <p className="text-zinc-200"><span className="text-green-400 font-bold">→ About:Blank</span> (Might Work)</p>
-                <p className="text-zinc-200"><span className="text-green-400 font-bold">→ Blob</span> (Recommended)</p>
-                <p className="text-zinc-200"><span className="text-green-400 font-bold">→ Filesystem</span> (Unrecommended - some games might not work, but it is hidden to the teacher.)</p>
-                <p className="text-zinc-200"><span className="text-green-400 font-bold">→ HTML File</span> (Very Recommended, COMING SOON!!!)</p>
-              </div>
-              <p className="text-zinc-400 text-sm mb-6">
-                ℹ️ This is used to bypass School Teachers Watching Your Screen.
-              </p>
-              <div className="flex gap-4 justify-end">
-                <button 
-                  onClick={() => handleDropbox('never')}
-                  className="px-6 py-2 rounded-md bg-red-600 hover:bg-red-500 font-bold transition-colors text-white"
-                >
-                  Never
-                </button>
-                <button 
-                  onClick={() => handleDropbox('ask')}
-                  className="px-6 py-2 rounded-md bg-yellow-600 hover:bg-yellow-500 font-bold transition-colors text-white"
-                >
-                  Ask Later
-                </button>
-                <button 
-                  onClick={() => handleDropbox('always')}
-                  className="px-6 py-2 rounded-md bg-green-600 hover:bg-green-500 font-bold transition-colors text-white"
-                >
-                  Always
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {dropboxToast && (
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 50 }}
-            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] text-white font-bold text-lg"
-          >
-            <div className="bg-zinc-900 border border-zinc-700 px-6 py-3 rounded-lg shadow-lg animate-pulse">
-              To enable, go to settings
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {warningGame && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-sm flex items-center justify-center"
-          >
-            <motion.div 
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
-              className="bg-zinc-900 border-2 border-red-500 p-8 rounded-lg max-w-md w-full shadow-2xl mx-4"
-            >
-              <h2 className="text-2xl font-bold mb-4 text-red-400">⚠️ Warning</h2>
-              <p className="text-white mb-6 text-lg font-semibold">
-                DO NOT CLICK NOTHING ON THE SCREEN IF IT SAYS "404 page not found"
-              </p>
-              <p className="text-zinc-300 mb-8 leading-relaxed">
-                Just click continue and click Stop game, if it shows 404 page not found. If it doesn't, just continue and play the game.
-              </p>
-              <div className="flex items-center gap-2 mb-6 bg-red-900/30 border border-red-700 p-3 rounded">
-                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                <p className="text-red-300 text-sm font-semibold">This error is getting fixed as soon as possible.</p>
-              </div>
-              <div className="flex gap-4 justify-end">
-                <button 
-                  onClick={() => setWarningGame(null)}
-                  className="px-6 py-2 rounded-md hover:bg-zinc-800 font-bold transition-colors text-white"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={async () => {
-                    setWarningGame(null);
-                    if (warningGame) {
-                      await actuallyPlayGame(warningGame);
-                    }
-                  }}
-                  className="px-6 py-2 rounded-md bg-green-600 hover:bg-green-500 font-bold transition-colors text-white"
-                >
-                  Continue
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {pendingGameToPlay && (
-          <motion.div initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center">
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-zinc-900 border border-zinc-800 p-6 rounded-lg max-w-md w-full shadow-2xl">
-              <h2 className="text-xl font-bold mb-2">Quick Resume Limit Reached</h2>
-              <p className="text-zinc-400 mb-6 text-sm">
-                You have reached the maximum of 6 suspended games. Would you like to close the oldest suspended game ({suspendedGames[0]?.game.title}) to launch this new game, or cancel?
-              </p>
-              <div className="flex gap-4 justify-end">
-                <button 
-                  onClick={() => setPendingGameToPlay(null)}
-                  className="px-4 py-2 rounded-md hover:bg-zinc-800 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={() => {
-                    const newSuspended = suspendedGames.slice(1);
-                    setSuspendedGames(newSuspended);
-                    const game = pendingGameToPlay;
-                    setPendingGameToPlay(null);
-                    actuallyPlayGame(game);
-                  }}
-                  className="px-4 py-2 rounded-md bg-green-600 hover:bg-green-500 font-bold transition-colors text-white"
-                >
-                  Close Oldest & Play
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <nav className="flex items-start justify-between px-12 pt-12 pb-4 z-50 shrink-0">
-        <div 
-          className="flex items-center gap-4 cursor-pointer hover:bg-white/10 p-2 -ml-2 rounded-xl transition-colors focus:ring-2 focus:ring-green-500 focus:outline-none"
-          onClick={() => setCurrentView('profile')}
-          tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('profile')}
-        >
-          <img src={activeProfile.avatar} alt="Avatar" className="w-14 h-14 rounded-full border-2 border-white/20 object-cover" />
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <h2 className="font-semibold text-lg leading-tight">
-                {activeProfile.gamertag}
-              </h2>
-            </div>
-            <div className="flex items-center gap-1.5 text-zinc-300 mt-0.5">
-              <Trophy size={14} className="text-zinc-400" />
-              <span className="text-sm font-medium">{activeProfile.score}</span>
-            </div>
-          </div>
+      <div className={`h-screen ${getThemeClasses(activeProfile.homeTheme)} text-white font-sans overflow-hidden flex flex-col relative z-0`}>
+        <WelcomeMessage />
+        <div className="fixed inset-0 z-[-1] opacity-50">
+          <div className="absolute inset-0 bg-gradient-to-tr from-black/80 via-transparent to-black/40" />
         </div>
 
-        <div className="flex items-center gap-6 text-zinc-100">
-          <button onClick={() => setIsSearchOpen(true)} className="hover:text-green-400 transition-colors focus:ring-2 focus:ring-green-500 focus:outline-none rounded-full p-1">
-            <Search size={22} />
-          </button>
-          <button onClick={() => setCurrentView('notifications')} className="relative hover:text-green-400 transition-colors focus:ring-2 focus:ring-green-500 focus:outline-none rounded-full p-1">
-            <Bell size={22} />
-            {notificationCount > 0 && (
-              <span className="absolute -top-1 -right-1.5 bg-green-500 text-black text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-[#1a1a1a]">
-                {notificationCount}
-              </span>
-            )}
-          </button>
-          <button onClick={() => setCurrentView('friends')} className="hover:text-green-400 transition-colors focus:ring-2 focus:ring-green-500 focus:outline-none rounded-full p-1">
-            <Users size={22} />
-          </button>
-          <div className="flex items-center gap-4">
-            {batteryInfo.isSupported && (
-              <div className="flex items-center gap-1.5 text-zinc-300">
-                <span className="text-sm font-medium">{batteryInfo.level}%</span>
-                {batteryInfo.charging ? (
-                  <BatteryCharging size={20} className="text-green-400" />
-                ) : (
-                  <>
-                    {batteryInfo.level > 80 && <BatteryFull size={20} />}
-                    {batteryInfo.level > 20 && batteryInfo.level <= 80 && <BatteryMedium size={20} />}
-                    {batteryInfo.level <= 20 && <BatteryLow size={20} className="text-red-500" />}
-                  </>
-                )}
-              </div>
-            )}
-            <span className="font-semibold text-lg">{time}</span>
-          </div>
-        </div>
-      </nav>
-
-      <AnimatePresence>
-        {showGreetingToast && (
-          <motion.div 
-            initial={{ opacity: 0, y: -50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -50 }}
-            className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] bg-zinc-900/40 backdrop-blur-md border border-white/10 px-6 py-3 rounded-full flex items-center gap-4 shadow-2xl"
+        {!playingGame && (
+          <motion.button 
+            layoutId="guide-button"
+            onClick={() => setIsGuideOpen(true)}
+            className="fixed top-8 right-8 z-[260] w-12 h-12 rounded-full bg-green-500 hover:bg-green-400 text-black font-bold text-xl flex items-center justify-center shadow-lg transition-transform hover:scale-105"
           >
-            <div className="w-8 h-8 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center">
-              <span className="text-lg">👋</span>
-            </div>
-            <div>
-              <p className="font-bold text-sm text-white">
-                {(() => {
-                  const hour = new Date().getHours();
-                  if (hour < 12) return 'Good morning, ';
-                  if (hour < 18) return 'Good afternoon, ';
-                  return 'Good evening, ';
-                })()}
-                {profile?.gamertag}!
-              </p>
-              <p className="text-zinc-400 text-xs font-semibold">Welcome back to dashboard.</p>
-            </div>
-          </motion.div>
+            E
+          </motion.button>
         )}
-      </AnimatePresence>
 
-      <AnimatePresence>
-        {showTrophyToast && (
-          <motion.div 
-            initial={{ opacity: 0, y: -50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -50 }}
-            className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] bg-zinc-900/40 backdrop-blur-md border border-white/10 px-6 py-3 rounded-full flex items-center gap-4 shadow-2xl"
-          >
-            <div className="w-8 h-8 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center">
-              <Trophy size={16} />
-            </div>
-            <div>
-              <p className="font-bold text-sm text-white">Achievement Unlocked</p>
-              <p className="text-green-400 text-xs font-semibold">+10 Trophies earned!</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+        <EboxMusicToast />
+        <GuideMenu 
+          isOpen={isGuideOpen} 
+          onClose={() => setIsGuideOpen(false)} 
+          recentGames={activeProfile.recentGames || []}
+          onNavigate={(view) => {
+            if (playingGame && view !== 'home') {
+               setPlayingGame(null); // Optionally exit game when navigating away
+            }
+            setCurrentView(view as View);
+          }}
+        />
 
-      <AnimatePresence>
-        {(playingGame || suspendedGames.length > 0) && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className={`fixed inset-0 z-[100] bg-black flex flex-col ${playingGame ? '' : 'pointer-events-none opacity-0'}`}
-            style={{ display: playingGame ? 'flex' : 'none' }}
-          >
-            <AnimatePresence>
-              {isLoadingGame && playingGame && (
-                <motion.div 
-                  initial={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-0 z-[110] bg-black flex flex-col items-center justify-center gap-6"
-                >
-                  <div className="w-16 h-16 border-4 border-zinc-800 border-t-green-500 rounded-full animate-spin" />
-                  <p className="text-xl font-semibold animate-pulse">Loading {playingGame.title}...</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            {playingGame && (
-              <div className="h-12 bg-zinc-900 flex items-center justify-between px-4 shrink-0 shadow-md">
-                <span className="font-bold text-green-400">Playing {playingGame.title} ({playMinutes}m) - Earned: {Math.floor(playMinutes / 2) * 10} 🏆</span>
-                <div className="flex items-center gap-4">
-                  <motion.button 
-                    layoutId="guide-button"
-                    onClick={() => setIsGuideOpen(true)}
-                    className="z-[260] w-8 h-8 rounded-full bg-green-500 hover:bg-green-400 text-black font-bold flex items-center justify-center shadow-lg transition-transform hover:scale-105"
+        <AnimatePresence>
+          {showDropboxPrompt && !playingGame && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-sm flex items-center justify-center"
+            >
+              <motion.div 
+                initial={{ scale: 0.9 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0.9 }}
+                className="bg-zinc-900 border-2 border-yellow-500 p-8 rounded-lg max-w-2xl w-full shadow-2xl mx-4"
+              >
+                <h2 className="text-2xl font-bold mb-4 text-yellow-400">🚀 Anti-Teacher Mode</h2>
+                <p className="text-zinc-300 mb-6 text-lg leading-relaxed">
+                  Choose your cloak method:
+                </p>
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-zinc-300 mb-2">Select an option:</label>
+                  <div className="relative">
+                    <select
+                      value={dropboxSelection}
+                      onChange={(e) => setDropboxSelection(e.target.value)}
+                      className="w-full px-4 py-3 bg-zinc-800 border-2 border-zinc-700 rounded-md text-white font-semibold appearance-none cursor-pointer hover:border-green-500 focus:border-green-500 focus:outline-none transition-colors"
+                    >
+                      <option value="">-- Select a cloak method --</option>
+                      <option value="about-blank">About:Blank (Might Work)</option>
+                      <option value="blob">Blob (Recommended)</option>
+                      <option value="filesystem">Filesystem (Unrecommended - some games might not work)</option>
+                      <option value="html-file">HTML File (Very Recommended, COMING SOON!!!)</option>
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400" size={20} />
+                  </div>
+                </div>
+                <p className="text-zinc-400 text-sm mb-6">
+                  ℹ️ This is used to bypass School Teachers Watching Your Screen.
+                </p>
+                <div className="flex gap-4 justify-end">
+                  <button 
+                    onClick={() => handleDropbox('never')}
+                    className="px-6 py-2 rounded-md bg-red-600 hover:bg-red-500 font-bold transition-colors text-white"
                   >
-                    E
-                  </motion.button>
-                  <button onClick={handleStopGame} className="bg-red-600 px-4 py-1.5 rounded-md font-bold hover:bg-red-500 transition-colors flex items-center gap-2">
-                     Stop Game
+                    Never
+                  </button>
+                  <button 
+                    onClick={() => handleDropbox('ask')}
+                    className="px-6 py-2 rounded-md bg-yellow-600 hover:bg-yellow-500 font-bold transition-colors text-white"
+                  >
+                    Ask Later
+                  </button>
+                  <button 
+                    onClick={() => handleDropbox('always')}
+                    disabled={!dropboxSelection}
+                    className="px-6 py-2 rounded-md bg-green-600 hover:bg-green-500 disabled:bg-zinc-600 disabled:cursor-not-allowed font-bold transition-colors text-white"
+                  >
+                    Apply
                   </button>
                 </div>
-              </div>
-            )}
-            
-            {(() => {
-              const allActive = [...suspendedGames.map(s => s.game)];
-              if (playingGame && !allActive.find(g => g.id === playingGame.id)) {
-                allActive.push(playingGame);
-              }
-              return allActive.map((g, idx) => (
-                <div className={playingGame?.id === g.id ? "flex-1 w-full relative bg-white block" : "hidden"} key={g.id}>
-                  
-                  {localStorage.getItem('anti_deledao') === 'true' && playingGame?.id === g.id && (
-                    <div className="absolute inset-0 pointer-events-none z-[105]" style={{ backgroundImage: 'url(https://upload.wikimedia.org/wikipedia/commons/c/c3/Google_Docs_logo_%282014-2020%29.svg)', backgroundSize: '200px', backgroundPosition: 'center', opacity: 0.03 }} />
-                  )}
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-                  <iframe 
-                  key={g.id}
-                  src={getUrl(g.file, idx)} 
-                  className="w-full h-full" 
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups allow-presentation"
-                  allow="fullscreen; autoplay; gamepad"
-                  onLoad={() => { if (playingGame?.id === g.id) setIsLoadingGame(false); }}
-                />
-                </div>
-              ));
-            })()}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <main className="flex-1 min-h-0 overflow-hidden relative z-10 flex flex-col w-full">
-        <AnimatePresence mode="wait">
-          {currentView === 'home' && (
-            <motion.div key="home" initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="flex-1 min-h-0 overflow-y-auto px-12 py-8">
-              <div className="flex gap-4 shrink-0 overflow-x-auto pb-4 items-center">
-                <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('library')} onClick={() => setCurrentView('library')} className="w-[160px] h-[160px] bg-zinc-800/90 rounded-md cursor-pointer hover:bg-zinc-700 focus:bg-zinc-700 group transition-colors flex flex-col items-center justify-center shrink-0 border-2 border-transparent group-hover:border-green-500 group-focus:border-green-500">
-                  <Library className="text-zinc-300 mb-2 group-hover:text-white transition-colors" size={48} />
-                  <span className="font-semibold text-sm text-center px-1 text-white">My games & apps</span>
-                </div>
-                
-                {displayGames.slice(0,8).map((g) => (
-                  <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handlePlayGame({id: g.id, title: g.title, file: g.file})} key={g.id} onClick={() => handlePlayGame({id: g.id, title: g.title, file: g.file})} className="w-[160px] h-[160px] bg-zinc-800 rounded-md cursor-pointer group hover:scale-105 focus:scale-105 transition-transform shrink-0 overflow-hidden border-2 border-transparent hover:border-green-500 focus:border-green-500">
-                    <img src={g.image} className="w-full h-full object-cover group-hover:scale-105 group-focus:scale-105 transition-transform" />
-                  </div>
-                ))}
-
-                <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('settings')} onClick={() => setCurrentView('settings')} className="w-[160px] h-[160px] bg-zinc-800/90 border-2 border-transparent hover:border-green-500 focus:border-green-500 rounded-md cursor-pointer hover:bg-zinc-700 focus:bg-zinc-700 group transition-colors flex flex-col items-center justify-center shrink-0">
-                  <Settings size={48} className="text-zinc-300 group-hover:text-white group-focus:text-white transition-colors mb-2" />
-                  <span className="font-semibold text-sm text-white">Settings</span>
-                </div>
-
-                <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('friends')} onClick={() => setCurrentView('friends')} className="w-[160px] h-[160px] bg-purple-600 rounded-md cursor-pointer hover:bg-purple-500 focus:bg-purple-500 group transition-colors flex flex-col items-center justify-center shrink-0 border-2 border-transparent group-hover:border-green-500 group-focus:border-green-500">
-                  <Users size={48} className="text-white mb-2" />
-                  <span className="font-semibold text-sm text-white">Friends</span>
-                </div>
-
-                <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('activity')} onClick={() => setCurrentView('activity')} className="w-[160px] h-[160px] bg-blue-600 rounded-md cursor-pointer hover:bg-blue-500 focus:bg-blue-500 group transition-colors flex flex-col items-center justify-center shrink-0 border-2 border-transparent group-hover:border-green-500 group-focus:border-green-500">
-                  <Flame size={48} className="text-white mb-2 group-hover:text-yellow-400 transition-colors" />
-                  <span className="font-semibold text-sm text-white">Activity</span>
-                </div>
-
-                <div tabIndex={0} className="w-[160px] h-[160px] bg-zinc-200 rounded-md flex flex-col justify-center items-center border-[3px] border-transparent hover:border-white focus:border-green-500 cursor-not-allowed opacity-50 shrink-0 group">
-                  <Store size={48} className="text-zinc-800 mb-2 group-hover:scale-105 transition-transform" />
-                  <span className="font-semibold text-sm text-zinc-900">Store</span>
-                </div>
+        <AnimatePresence>
+          {dropboxToast && (
+            <motion.div
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 50 }}
+              className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] text-white font-bold text-lg"
+            >
+              <div className="bg-zinc-900 border border-zinc-700 px-6 py-3 rounded-lg shadow-lg animate-pulse">
+                To enable, go to settings
               </div>
             </motion.div>
           )}
+        </AnimatePresence>
 
-          {currentView === 'library' && (
-            <motion.div key="library" initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="flex-1 min-h-0 overflow-hidden px-12 py-8 flex flex-col">
-              <div className="flex items-center gap-4 mb-2 shrink-0">
-                <button onClick={() => setCurrentView('home')} className="p-2 hover:bg-white/10 rounded-full transition-colors -ml-2">
-                  <ChevronLeft size={24} />
-                </button>
-                <h2 className="text-3xl font-black">My games & apps</h2>
-              </div>
-              <div className="flex flex-1 min-h-0 gap-8">
-                <div className="w-48 flex flex-col gap-2 shrink-0">
+        <AnimatePresence>
+          {warningGame && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-sm flex items-center justify-center"
+            >
+              <motion.div 
+                initial={{ scale: 0.9 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0.9 }}
+                className="bg-zinc-900 border-2 border-red-500 p-8 rounded-lg max-w-md w-full shadow-2xl mx-4"
+              >
+                <h2 className="text-2xl font-bold mb-4 text-red-400">⚠️ Warning</h2>
+                <p className="text-white mb-6 text-lg font-semibold">
+                  DO NOT CLICK NOTHING ON THE SCREEN IF IT SAYS "404 page not found"
+                </p>
+                <p className="text-zinc-300 mb-8 leading-relaxed">
+                  Just click continue and click Stop game, if it shows 404 page not found. If it doesn't, just continue and play the game.
+                </p>
+                <div className="flex items-center gap-2 mb-6 bg-red-900/30 border border-red-700 p-3 rounded">
+                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                  <p className="text-red-300 text-sm font-semibold">This error is getting fixed as soon as possible.</p>
+                </div>
+                <div className="flex gap-4 justify-end">
                   <button 
-                    onClick={() => setLibraryTab('games')}
-                    className={`text-left px-4 py-3 rounded-md font-bold transition-colors ${libraryTab === 'games' ? 'bg-green-600 text-white' : 'hover:bg-white/10 text-zinc-400'}`}
+                    onClick={() => setWarningGame(null)}
+                    className="px-6 py-2 rounded-md hover:bg-zinc-800 font-bold transition-colors text-white"
                   >
-                    Games
+                    Cancel
                   </button>
                   <button 
-                    onClick={() => setLibraryTab('apps')}
-                    className={`text-left px-4 py-3 rounded-md font-bold transition-colors ${libraryTab === 'apps' ? 'bg-green-600 text-white' : 'hover:bg-white/10 text-zinc-400'}`}
+                    onClick={async () => {
+                      setWarningGame(null);
+                      if (warningGame) {
+                        await actuallyPlayGame(warningGame);
+                      }
+                    }}
+                    className="px-6 py-2 rounded-md bg-green-600 hover:bg-green-500 font-bold transition-colors text-white"
                   >
-                    Apps
+                    Continue
                   </button>
                 </div>
-                <div className="flex-1 overflow-y-auto">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 pb-12">
-                    {displayGames.filter(g => (g as any).type === (libraryTab === 'games' ? 'game' : 'app')).map(item => (
-                      <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handlePlayGame({id: item.id, title: item.title, file: item.file})} key={item.id} onClick={() => handlePlayGame({id: item.id, title: item.title, file: item.file})} className="group cursor-pointer">
-                        <div className="aspect-[3/4] bg-zinc-800 rounded-md overflow-hidden border-[3px] border-transparent group-hover:border-green-500 group-focus:border-green-500 transition-colors relative">
-                          <img src={item.image} className="w-full h-full object-cover group-hover:scale-105 group-focus:scale-105 transition-transform" alt={item.title} />
-                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 group-focus:opacity-100 flex items-center justify-center transition-opacity">
-                            <Trophy size={48} className="text-green-500" />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {pendingGameToPlay && (
+            <motion.div initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-sm flex items-center justify-center">
+              <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-zinc-900 border border-zinc-800 p-6 rounded-lg max-w-md w-full shadow-2xl">
+                <h2 className="text-xl font-bold mb-2">Quick Resume Limit Reached</h2>
+                <p className="text-zinc-400 mb-6 text-sm">
+                  You have reached the maximum of 6 suspended games. Would you like to close the oldest suspended game ({suspendedGames[0]?.game.title}) to launch this new game, or cancel?
+                </p>
+                <div className="flex gap-4 justify-end">
+                  <button 
+                    onClick={() => setPendingGameToPlay(null)}
+                    className="px-4 py-2 rounded-md hover:bg-zinc-800 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={() => {
+                      const newSuspended = suspendedGames.slice(1);
+                      setSuspendedGames(newSuspended);
+                      const game = pendingGameToPlay;
+                      setPendingGameToPlay(null);
+                      actuallyPlayGame(game);
+                    }}
+                    className="px-4 py-2 rounded-md bg-green-600 hover:bg-green-500 font-bold transition-colors text-white"
+                  >
+                    Close Oldest & Play
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <nav className="flex items-start justify-between px-12 pt-12 pb-4 z-50 shrink-0">
+          <div 
+            className="flex items-center gap-4 cursor-pointer hover:bg-white/10 p-2 -ml-2 rounded-xl transition-colors focus:ring-2 focus:ring-green-500 focus:outline-none"
+            onClick={() => setCurrentView('profile')}
+            tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('profile')}
+          >
+            <img src={activeProfile.avatar} alt="Avatar" className="w-14 h-14 rounded-full border-2 border-white/20 object-cover" />
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <h2 className="font-semibold text-lg leading-tight">
+                  {activeProfile.gamertag}
+                </h2>
+              </div>
+              <div className="flex items-center gap-1.5 text-zinc-300 mt-0.5">
+                <Trophy size={14} className="text-zinc-400" />
+                <span className="text-sm font-medium">{activeProfile.score}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-6 text-zinc-100">
+            <button onClick={() => setIsSearchOpen(true)} className="hover:text-green-400 transition-colors focus:ring-2 focus:ring-green-500 focus:outline-none rounded-full p-1">
+              <Search size={22} />
+            </button>
+            <button onClick={() => setCurrentView('notifications')} className="relative hover:text-green-400 transition-colors focus:ring-2 focus:ring-green-500 focus:outline-none rounded-full p-1">
+              <Bell size={22} />
+              {notificationCount > 0 && (
+                <span className="absolute -top-1 -right-1.5 bg-green-500 text-black text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-[#1a1a1a]">
+                  {notificationCount}
+                </span>
+              )}
+            </button>
+            <button onClick={() => setCurrentView('friends')} className="hover:text-green-400 transition-colors focus:ring-2 focus:ring-green-500 focus:outline-none rounded-full p-1">
+              <Users size={22} />
+            </button>
+            <div className="flex items-center gap-4">
+              {batteryInfo.isSupported && (
+                <div className="flex items-center gap-1.5 text-zinc-300">
+                  <span className="text-sm font-medium">{batteryInfo.level}%</span>
+                  {batteryInfo.charging ? (
+                    <BatteryCharging size={20} className="text-green-400" />
+                  ) : (
+                    <>
+                      {batteryInfo.level > 80 && <BatteryFull size={20} />}
+                      {batteryInfo.level > 20 && batteryInfo.level <= 80 && <BatteryMedium size={20} />}
+                      {batteryInfo.level <= 20 && <BatteryLow size={20} className="text-red-500" />}
+                    </>
+                  )}
+                </div>
+              )}
+              <span className="font-semibold text-lg">{time}</span>
+            </div>
+          </div>
+        </nav>
+
+        <AnimatePresence>
+          {showGreetingToast && (
+            <motion.div 
+              initial={{ opacity: 0, y: -50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -50 }}
+              className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] bg-zinc-900/40 backdrop-blur-md border border-white/10 px-6 py-3 rounded-full flex items-center gap-4 shadow-2xl"
+            >
+              <div className="w-8 h-8 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center">
+                <span className="text-lg">👋</span>
+              </div>
+              <div>
+                <p className="font-bold text-sm text-white">
+                  {(() => {
+                    const hour = new Date().getHours();
+                    if (hour < 12) return 'Good morning, ';
+                    if (hour < 18) return 'Good afternoon, ';
+                    return 'Good evening, ';
+                  })()}
+                  {profile?.gamertag}!
+                </p>
+                <p className="text-zinc-400 text-xs font-semibold">Welcome back to dashboard.</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showTrophyToast && (
+            <motion.div 
+              initial={{ opacity: 0, y: -50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -50 }}
+              className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] bg-zinc-900/40 backdrop-blur-md border border-white/10 px-6 py-3 rounded-full flex items-center gap-4 shadow-2xl"
+            >
+              <div className="w-8 h-8 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center">
+                <Trophy size={16} />
+              </div>
+              <div>
+                <p className="font-bold text-sm text-white">Achievement Unlocked</p>
+                <p className="text-green-400 text-xs font-semibold">+10 Trophies earned!</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {(playingGame || suspendedGames.length > 0) && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className={`fixed inset-0 z-[100] bg-black flex flex-col ${playingGame ? '' : 'pointer-events-none opacity-0'}`}
+              style={{ display: playingGame ? 'flex' : 'none' }}
+            >
+              <AnimatePresence>
+                {isLoadingGame && playingGame && (
+                  <motion.div 
+                    initial={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 z-[110] bg-black flex flex-col items-center justify-center gap-6"
+                  >
+                    <div className="w-16 h-16 border-4 border-zinc-800 border-t-green-500 rounded-full animate-spin" />
+                    <p className="text-xl font-semibold animate-pulse">Loading {playingGame.title}...</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              {playingGame && (
+                <div className="h-12 bg-zinc-900 flex items-center justify-between px-4 shrink-0 shadow-md">
+                  <span className="font-bold text-green-400">Playing {playingGame.title} ({playMinutes}m) - Earned: {Math.floor(playMinutes / 2) * 10} 🏆</span>
+                  <div className="flex items-center gap-4">
+                    <motion.button 
+                      layoutId="guide-button"
+                      onClick={() => setIsGuideOpen(true)}
+                      className="z-[260] w-8 h-8 rounded-full bg-green-500 hover:bg-green-400 text-black font-bold flex items-center justify-center shadow-lg transition-transform hover:scale-105"
+                    >
+                      E
+                    </motion.button>
+                    <button onClick={handleStopGame} className="bg-red-600 px-4 py-1.5 rounded-md font-bold hover:bg-red-500 transition-colors flex items-center gap-2">
+                       Stop Game
+                    </button>
+                  </div>
+                </div>
+              )}
+              
+              {(() => {
+                const allActive = [...suspendedGames.map(s => s.game)];
+                if (playingGame && !allActive.find(g => g.id === playingGame.id)) {
+                  allActive.push(playingGame);
+                }
+                return allActive.map((g, idx) => (
+                  <div className={playingGame?.id === g.id ? "flex-1 w-full relative bg-white block" : "hidden"} key={g.id}>
+                    
+                    {localStorage.getItem('anti_deledao') === 'true' && playingGame?.id === g.id && (
+                      <div className="absolute inset-0 pointer-events-none z-[105]" style={{ backgroundImage: 'url(https://upload.wikimedia.org/wikipedia/commons/c/c3/Google_Docs_logo_%282014-2020%29.svg)', backgroundRepeat: 'repeat', opacity: 0.1 }} />
+                    )}
+
+                    <iframe 
+                    key={g.id}
+                    src={getUrl(g.file, idx)} 
+                    className="w-full h-full" 
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups allow-presentation"
+                    allow="fullscreen; autoplay; gamepad"
+                    onLoad={() => { if (playingGame?.id === g.id) setIsLoadingGame(false); }}
+                  />
+                  </div>
+                ));
+              })()}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <main className="flex-1 min-h-0 overflow-hidden relative z-10 flex flex-col w-full">
+          <AnimatePresence mode="wait">
+            {currentView === 'home' && (
+              <motion.div key="home" initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="flex flex-col flex-1 overflow-y-auto pb-8">
+                <div className="flex gap-4 shrink-0 overflow-x-auto pb-4 items-center px-12 pt-8">
+                  <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('library')} onClick={() => setCurrentView('library')} className="w-[160px] h-[160px] bg-zinc-800/90 rounded-lg flex flex-col justify-center items-center border-[3px] border-transparent hover:border-green-500 focus:border-green-500 group cursor-pointer flex-shrink-0 transition-colors">
+                    <Library className="text-zinc-300 mb-2 group-hover:text-white transition-colors" size={48} />
+                    <span className="font-semibold text-sm text-center px-1 text-white">My games & apps</span>
+                  </div>
+                  
+                  {displayGames.slice(0,8).map((g) => (
+                    <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handlePlayGame({id: g.id, title: g.title, file: g.file})} key={g.id} onClick={() => handlePlayGame({id: g.id, title: g.title, file: g.file})} className="w-[160px] h-[160px] rounded-lg overflow-hidden border-[3px] border-transparent hover:border-green-500 focus:border-green-500 flex-shrink-0 group cursor-pointer flex-col transition-colors relative">
+                      <img src={g.image} className="w-full h-full object-cover group-hover:scale-105 group-focus:scale-105 transition-transform" />
+                    </div>
+                  ))}
+
+                  <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('settings')} onClick={() => setCurrentView('settings')} className="w-[160px] h-[160px] bg-zinc-800/90 rounded-lg flex flex-col justify-center items-center border-[3px] border-transparent hover:border-green-500 focus:border-green-500 group cursor-pointer flex-shrink-0 transition-colors">
+                    <Settings size={48} className="text-zinc-300 group-hover:text-white group-focus:text-white transition-colors mb-2" />
+                    <span className="font-semibold text-sm text-white">Settings</span>
+                  </div>
+
+                  <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('friends')} onClick={() => setCurrentView('friends')} className="w-[160px] h-[160px] bg-purple-600 rounded-lg flex flex-col justify-center items-center border-[3px] border-transparent hover:border-green-500 focus:border-green-500 group cursor-pointer flex-shrink-0 transition-colors">
+                    <Users size={48} className="text-white mb-2" />
+                    <span className="font-semibold text-sm text-white">Friends</span>
+                  </div>
+
+                  <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('activity')} onClick={() => setCurrentView('activity')} className="w-[160px] h-[160px] bg-blue-600 rounded-lg flex flex-col justify-center items-center border-[3px] border-transparent hover:border-green-500 focus:border-green-500 group cursor-pointer flex-shrink-0 transition-colors">
+                    <Flame size={48} className="text-white mb-2 group-hover:text-yellow-400 transition-colors" />
+                    <span className="font-semibold text-sm text-white">Activity</span>
+                  </div>
+
+                  <div tabIndex={0} className="w-[160px] h-[160px] bg-zinc-200 rounded-lg flex flex-col justify-center items-center border-[3px] border-transparent hover:border-white focus:border-green-500 group cursor-pointer flex-shrink-0 transition-colors">
+                    <Store size={48} className="text-zinc-800 mb-2 group-hover:scale-105 transition-transform" />
+                    <span className="font-semibold text-sm text-zinc-900">Store</span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {currentView === 'library' && (
+              <motion.div key="library" initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="flex flex-col flex-1 overflow-hidden px-12 pt-8">
+                <div className="flex items-center gap-4 mb-2 shrink-0">
+                  <button onClick={() => setCurrentView('home')} className="p-2 hover:bg-white/10 rounded-full transition-colors -ml-2">
+                    <ChevronLeft size={24} />
+                  </button>
+                  <h2 className="text-3xl font-black">My games & apps</h2>
+                </div>
+                <div className="flex flex-1 min-h-0 gap-8">
+                  <div className="w-48 flex flex-col gap-2 shrink-0">
+                    <button 
+                      onClick={() => setLibraryTab('games')}
+                      className={`text-left px-4 py-3 rounded-md font-bold transition-colors ${libraryTab === 'games' ? 'bg-green-600 text-white' : 'hover:bg-white/10 text-zinc-400'}`}
+                    >
+                      Games
+                    </button>
+                    <button 
+                      onClick={() => setLibraryTab('apps')}
+                      className={`text-left px-4 py-3 rounded-md font-bold transition-colors ${libraryTab === 'apps' ? 'bg-green-600 text-white' : 'hover:bg-white/10 text-zinc-400'}`}
+                    >
+                      Apps
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 pb-12">
+                      {displayGames.filter(g => (g as any).type === (libraryTab === 'games' ? 'game' : 'app')).map(item => (
+                        <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handlePlayGame({id: item.id, title: item.title, file: item.file})} key={item.id} onClick={() => handlePlayGame({id: item.id, title: item.title, file: item.file})} className="group cursor-pointer">
+                          <div className="aspect-[3/4] bg-zinc-800 rounded-md overflow-hidden border-[3px] border-transparent group-hover:border-green-500 group-focus:border-green-500 transition-colors relative">
+                            <img src={item.image} className="w-full h-full object-cover group-hover:scale-105 group-focus:scale-105 transition-transform" alt={item.title} />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 group-focus:opacity-100 flex items-center justify-center transition-opacity">
+                              <Trophy size={48} className="text-green-500" />
+                            </div>
+                          </div>
+                          <div className="mt-2 px-1">
+                            <p className="font-semibold text-sm truncate">{item.title}</p>
                           </div>
                         </div>
-                        <div className="mt-2 px-1">
-                          <p className="font-semibold text-sm truncate">{item.title}</p>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </motion.div>
-          )}
+              </motion.div>
+            )}
 
-          {currentView === 'profile' && <Profile key="profile" userProfile={activeProfile} onBack={() => setCurrentView('home')} />}
-          
-          {currentView === 'friends' && <Friends key="friends" userProfile={activeProfile} onBack={() => setCurrentView('home')} onChat={(fId, fTag) => { setChatFriendId(fId); setChatFriendGamertag(fTag); setCurrentView('chat'); }} />}
-          
-          {currentView === 'notifications' && <Notifications key="notifications" userProfile={activeProfile} onBack={() => setCurrentView('home')} />}
-          {currentView === 'party' && <Party key="party" profile={activeProfile} onBack={() => setCurrentView('home')} />}
-          {currentView === 'activity' && <ActivityFeed key="activity" />}
-          {currentView === 'chat' && <Chat key="chat" userProfile={activeProfile} friendId={chatFriendId} friendGamertag={chatFriendGamertag} onBack={() => setCurrentView('friends')} />}
+            {currentView === 'profile' && <Profile key="profile" userProfile={activeProfile} onBack={() => setCurrentView('home')} />}
+            
+            {currentView === 'friends' && <Friends key="friends" userProfile={activeProfile} onBack={() => setCurrentView('home')} onChat={(fId, fTag) => { setChatFriendId(fId); setChatFriendGamertag(fTag); setCurrentView('chat'); }} />}
+            
+            {currentView === 'notifications' && <Notifications key="notifications" userProfile={activeProfile} onBack={() => setCurrentView('home')} />}
+            {currentView === 'party' && <Party key="party" profile={activeProfile} onBack={() => setCurrentView('home')} />}
+            {currentView === 'activity' && <ActivityFeed key="activity" />}
+            {currentView === 'chat' && <Chat key="chat" userProfile={activeProfile} friendId={chatFriendId} friendGamertag={chatFriendGamertag} onBack={() => setCurrentView('friends')} />}
 
-          {currentView === 'settings' && <SettingsView profile={activeProfile as any} onBack={() => setCurrentView('home')} onLogout={handleLogout} isGuestMode={isGuestMode} />}
-        </AnimatePresence>
-      </main>
-    </div>
+            {currentView === 'settings' && <SettingsView profile={activeProfile as any} onBack={() => setCurrentView('home')} onLogout={handleLogout} isGuestMode={isGuestMode} />}
+          </AnimatePresence>
+        </main>
+      </div>
     </>
   );
 }
