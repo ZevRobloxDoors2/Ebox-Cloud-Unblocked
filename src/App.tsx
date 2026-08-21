@@ -238,11 +238,23 @@ export default function App() {
     'https://gateway.k12-resources-hub.com'
   ];
 
+  // Helper to get the base path for GitHub Pages or dev
+  const getBasePath = () => {
+    // Check if we're on GitHub Pages
+    const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (!isDev) {
+      // On GitHub Pages, we need to include the repo name
+      return '/Ebox-Cloud-Unblocked';
+    }
+    return ''; // Local dev uses root path
+  };
+
   const getUrl = (file: string, index: number) => {
     if (file.startsWith('http://') || file.startsWith('https://')) {
       return file;
     }
-    return `/${file}`;
+    const basePath = getBasePath();
+    return `${basePath}/public/${file}`;
   };
 
   const actuallyPlayGame = async (game: {id: string, title: string, file: string}) => {
