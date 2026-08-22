@@ -66,6 +66,8 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && isValidMessage(incoming())
         && incoming().createdAt == request.time;
+      allow update: if isSignedIn() && existing().senderId == request.auth.uid;
+      allow delete: if isSignedIn() && existing().senderId == request.auth.uid;
     }
 
     match /groupChats/{chatId} {

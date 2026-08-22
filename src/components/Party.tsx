@@ -12,7 +12,8 @@ const servers = {
   ],
 };
 
-export const Party: React.FC<{ profile: any, onBack: () => void }> = ({ profile, onBack }) => {
+export const Party: React.FC<{ profile: any, onBack: () => void, initialPartyId?: string }> = ({ profile, onBack, initialPartyId }) => {
+  const [partyId] = useState(initialPartyId || Math.random().toString(36).substring(2, 9));
   const [partyMembers, setPartyMembers] = useState<any[]>([]);
   const [isMuted, setIsMuted] = useState(false);
   const [micPermissionGranted, setMicPermissionGranted] = useState(false);
@@ -22,7 +23,7 @@ export const Party: React.FC<{ profile: any, onBack: () => void }> = ({ profile,
   const [micError, setMicError] = useState('');
   const localStream = useRef<MediaStream | null>(null);
   const peers = useRef<Record<string, RTCPeerConnection>>({});
-  const partyId = 'global-party';
+  
 
   useEffect(() => {
     // Always listen to party members
@@ -199,6 +200,7 @@ export const Party: React.FC<{ profile: any, onBack: () => void }> = ({ profile,
       document.body.appendChild(audio);
     }
     audio.srcObject = stream;
+    audio.play().catch(e => console.error('Audio play error:', e));
   };
 
   const toggleMute = async () => {
@@ -232,7 +234,7 @@ export const Party: React.FC<{ profile: any, onBack: () => void }> = ({ profile,
           list.push({ uid: r.fromUid, gamertag: r.fromGamertag });
         }
       }
-      setFriendsList(list);
+      setFriendsList(list.filter((v,i,a)=>a.findIndex(t=>(t.uid === v.uid))===i));
     });
     return () => unsub();
   }, [showInviteModal, profile.uid]);

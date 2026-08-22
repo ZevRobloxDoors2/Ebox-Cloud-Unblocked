@@ -20,6 +20,7 @@ import { EboxMusicToast } from './components/EboxMusicToast';
 import { Settings as SettingsView } from './components/Settings';
 import { DMCAModal } from './components/DMCAModal';
 import { StartupAnimation } from './components/StartupAnimation';
+import { BetaWarningModal } from './components/BetaWarningModal';
 import { WelcomeMessage } from './components/WelcomeMessage';
 import { useSpatialNavigation } from './hooks/useSpatialNavigation';
 import { ALL_GAMES } from './games';
@@ -161,9 +162,14 @@ export default function App() {
     }
   }, []);
   
+  const [activePartyId, setActivePartyId] = useState<string | undefined>(undefined);
   const [chatConfig, setChatConfig] = useState<{id: string, name: string, isGroup: boolean} | null>(null);
   
   // Playing state
+  const [isLoadingGame, setIsLoadingGame] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [showGreetingToast, setShowGreetingToast] = useState(false);
+  const [showTrophyToast, setShowTrophyToast] = useState(false);
   const [playingGame, setPlayingGame] = useState<{ id: string, title: string, file: string } | null>(null);
   const [playMinutes, setPlayMinutes] = useState(0);
   const [suspendedGames, setSuspendedGames] = useState<{game: {id: string, title: string, file: string}, minutes: number}[]>([]);
@@ -219,6 +225,9 @@ export default function App() {
       setShowDropboxPrompt(false);
       setDropboxToast(true);
       setTimeout(() => setDropboxToast(false), 3000);
+    } else if (choice === 'just_once') {
+      setShowDropboxPrompt(false);
+      applyDropboxCloak();
     } else if (choice === 'always') {
       localStorage.setItem('dropbox_prompt', 'always');
       setShowDropboxPrompt(false);
@@ -229,66 +238,63 @@ export default function App() {
   };
 
   const applyDropboxCloak = () => {
-    // Just simple about:blank cloak for now since the options are listed in text
-    let win = window.open();
-    if (win) {
-      win.document.body.style.margin = '0';
-      win.document.body.style.height = '100vh';
-      let iframe = win.document.createElement('iframe');
-      iframe.style.border = 'none';
-      iframe.style.width = '100%';
-      iframe.style.height = '100%';
-      iframe.style.margin = '0';
-      iframe.src = window.location.href;
-      win.document.body.appendChild(iframe);
-      window.location.replace("https://google.com");
+    const code = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>body,html{margin:0;padding:0;height:100%;overflow:hidden;}</style>
+        <title>${localStorage.getItem('cloak_title') || 'Google'}</title>
+        <link rel="icon" href="${localStorage.getItem('cloak_icon') || 'https://www.google.com/favicon.ico'}">
+      </head>
+      <body>
+        <iframe src="${window.location.href}" style="border:none;width:100%;height:100%;margin:0;padding:0;"></iframe>
+      </body>
+      </html>
+    `;
+    
+    let win: any;
+    if (dropboxSelection === 'blob') {
+      const blob = new Blob([code], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      win = window.open(url, '_blank');
+      if (win) window.location.replace('https://classroom.google.com');
+    } else if (dropboxSelection === 'filesystem') {
+      const requestFileSystem = (window as any).requestFileSystem || (window as any).webkitRequestFileSystem;
+      if (requestFileSystem) {
+        requestFileSystem(0, 1024*1024, (fs: any) => {
+          fs.root.getFile('index.html', {create: true}, (fileEntry: any) => {
+            fileEntry.createWriter((fileWriter: any) => {
+              const blob = new Blob([code], {type: 'text/html'});
+              fileWriter.onwriteend = () => {
+                win = window.open(fileEntry.toURL(), '_blank');
+                if (win) window.location.replace('https://classroom.google.com');
+                else alert('Popup blocker prevented the cloak! Please allow popups.');
+              };
+              fileWriter.write(blob);
+            });
+          });
+        });
+        return; 
+      } else {
+        alert("Filesystem protocol not supported in this browser. Falling back to about:blank.");
+        win = window.open('about:blank', '_blank');
+        if (win) { win.document.write(code); win.document.close(); window.location.replace('https://classroom.google.com'); }
+      }
+    } else {
+      win = window.open('about:blank', '_blank');
+      if (win) {
+        win.document.write(code);
+        win.document.close();
+        window.location.replace('https://classroom.google.com');
+      }
+    }
+    
+    if (!win && dropboxSelection !== 'filesystem') {
+      alert('Popup blocker prevented the cloak! Please allow popups.');
     }
   };
 
-  // Hide dropbox prompt if it's been dismissed before
-  useEffect(() => {
-    const dropboxChoice = localStorage.getItem('dropbox_prompt');
-    if (dropboxChoice) {
-      setShowDropboxPrompt(false);
-    }
-  }, []);
-
-  const [isLoadingGame, setIsLoadingGame] = useState(false);
-  const [showTrophyToast, setShowTrophyToast] = useState(false);
-  const [notificationCount, setNotificationCount] = useState(0);
-
-  const [showGreetingToast, setShowGreetingToast] = useState(false);
-
-  useEffect(() => {
-    if (profile && currentView === 'home' && !showGreetingToast) {
-      setShowGreetingToast(true);
-      setTimeout(() => setShowGreetingToast(false), 5000);
-    }
-  }, [profile?.uid]);
-
-  // Rotational Domains to bypass generic filters
-  const DOMAINS = [
-    'https://play.geometry-dash.co',
-    'https://tunnel.education-unblocked.com',
-    'https://study.math-games-fun.net',
-    'https://research.science-exploration.org',
-    'https://proxy.student-portal-access.com',
-    'https://app.learning-hub-interactive.io',
-    'https://node.homework-helper-online.net',
-    'https://gateway.k12-resources-hub.com'
-  ];
-
-  // Helper to get the base path for GitHub Pages or dev
-  const getBasePath = () => {
-    // Check if we're on GitHub Pages
-    const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    if (!isDev) {
-      // On GitHub Pages, we need to include the repo name
-      return '/Ebox-Cloud-Unblocked';
-    }
-    return ''; // Local dev uses root path
-  };
-
+  const getBasePath = () => { const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'; return !isDev ? '/Ebox-Cloud-Unblocked' : ''; };
   const getUrl = (file: string, index: number) => {
     if (file.startsWith('http://') || file.startsWith('https://')) {
       return file;
@@ -484,6 +490,7 @@ export default function App() {
         <AuthFlow onConfirm={() => setActiveSessionConfirmed(true)} />
         <WelcomeMessage />
         <DMCAModal />
+      <BetaWarningModal />
         <GlobalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} onNavigate={(v) => setCurrentView(v as any)} onPlayGame={handlePlayGame} />
       </>
     );
@@ -510,7 +517,7 @@ export default function App() {
   return (
     <>
       <DMCAModal />
-      <GlobalNotifications profile={activeProfile} playingGame={!!playingGame} onNavigateToChat={(id, isGroup, name) => { setChatConfig({id, name, isGroup}); setCurrentView('chat'); }} onNavigateToParty={() => setCurrentView('party')} />
+      <GlobalNotifications profile={activeProfile} playingGame={!!playingGame} onNavigateToChat={(id, isGroup, name) => { setChatConfig({id, name, isGroup}); setCurrentView('chat'); }} onNavigateToParty={(id) => { setActivePartyId(id); setCurrentView('party'); }} />
       <div className={`h-screen ${getThemeClasses(activeProfile.homeTheme)} text-white font-sans overflow-hidden flex flex-col relative z-0`}>
         <WelcomeMessage />
         <div className="fixed inset-0 z-[-1] opacity-50">
@@ -568,8 +575,8 @@ export default function App() {
                     >
                       <option value="">-- Select a cloak method --</option>
                       <option value="about-blank">About:Blank (Might Work)</option>
-                      <option value="blob">Blob (Recommended)</option>
-                      <option value="filesystem">Filesystem (Unrecommended - some games might not work)</option>
+                      <option value="blob">Blob: Protocol (Recommended)</option>
+                      <option value="filesystem">Filesystem: Protocol</option>
                       <option value="html-file">HTML File (Very Recommended, COMING SOON!!!)</option>
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400" size={20} />
@@ -596,7 +603,14 @@ export default function App() {
                     disabled={!dropboxSelection}
                     className="px-6 py-2 rounded-md bg-green-600 hover:bg-green-500 disabled:bg-zinc-600 disabled:cursor-not-allowed font-bold transition-colors text-white"
                   >
-                    Apply
+                    Always
+                  </button>
+                  <button 
+                    onClick={() => handleDropbox('just_once')}
+                    disabled={!dropboxSelection}
+                    className="px-6 py-2 rounded-md bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-600 disabled:cursor-not-allowed font-bold transition-colors text-white"
+                  >
+                    Just Once
                   </button>
                 </div>
               </motion.div>
@@ -956,7 +970,7 @@ export default function App() {
             {currentView === 'friends' && <Friends key="friends" userProfile={activeProfile} onBack={() => setCurrentView('home')} onChat={(id, name, isGroup) => { setChatConfig({id, name, isGroup: !!isGroup}); setCurrentView('chat'); }} />}
             
             {currentView === 'notifications' && <Notifications key="notifications" userProfile={activeProfile} onBack={() => setCurrentView('home')} />}
-            {currentView === 'party' && <Party key="party" profile={activeProfile} onBack={() => setCurrentView('home')} />}
+            {currentView === 'party' && <Party key="party" profile={activeProfile} initialPartyId={activePartyId} onBack={() => { setActivePartyId(undefined); setCurrentView('home'); }} />}
             {currentView === 'activity' && <ActivityFeed key="activity" />}
             {currentView === 'chat' && chatConfig && <Chat key="chat" userProfile={activeProfile} friendId={!chatConfig.isGroup ? chatConfig.id : undefined} friendGamertag={!chatConfig.isGroup ? chatConfig.name : undefined} chatId={chatConfig.isGroup ? chatConfig.id : undefined} isGroup={chatConfig.isGroup} chatName={chatConfig.isGroup ? chatConfig.name : undefined} onBack={() => setCurrentView('friends')} />}
 
