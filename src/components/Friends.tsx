@@ -64,7 +64,7 @@ export function Friends({ userProfile, onBack, onChat }: FriendsProps) {
           friendList.push({ uid: r.fromUid, gamertag: r.fromGamertag });
         }
       }
-      setFriends(friendList.filter((v,i,a)=>a.findIndex(t=>(t.uid === v.uid))===i));
+      setFriends(friendList);
     }, (err) => console.error(err));
 
     return () => unsubscribe();
