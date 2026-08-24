@@ -887,33 +887,33 @@ export default function App() {
             {currentView === 'home' && (
               <motion.div key="home" initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="flex flex-col flex-1 overflow-y-auto pb-8">
                 <div className="flex gap-4 shrink-0 overflow-x-auto pb-4 items-center px-12 pt-8">
-                  <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('library')} onClick={() => setCurrentView('library')} className="w-[160px] h-[160px] bg-zinc-800/90 rounded-lg flex flex-col justify-center items-center border-[3px] border-transparent hover:border-green-500 focus:border-green-500 group cursor-pointer flex-shrink-0 transition-colors">
+                  <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('library')} onClick={() => setCurrentView('library')} className="w-[160px] h-[160px] bg-zinc-800/90 rounded-lg flex flex-col justify-center items-center border-[3px] border-transparent hover:border-green-500 focus:border-green-500 focus:outline-none group cursor-pointer flex-shrink-0 transition-all duration-300 ease-out hover:scale-110 focus:scale-110 hover:shadow-[0_0_20px_rgba(34,197,94,0.6)] focus:shadow-[0_0_20px_rgba(34,197,94,0.6)] hover:z-10 focus:z-10">
                     <Library className="text-zinc-300 mb-2 group-hover:text-white transition-colors" size={48} />
                     <span className="font-semibold text-sm text-center px-1 text-white">My games & apps</span>
                   </div>
                   
                   {displayGames.slice(0,8).map((g) => (
-                    <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handlePlayGame({id: g.id, title: g.title, file: g.file})} key={g.id} onClick={() => handlePlayGame({id: g.id, title: g.title, file: g.file})} className="w-[160px] h-[160px] rounded-lg overflow-hidden border-[3px] border-transparent hover:border-green-500 focus:border-green-500 flex-shrink-0 group cursor-pointer flex-col transition-colors relative">
+                    <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handlePlayGame({id: g.id, title: g.title, file: g.file})} key={g.id} onClick={() => handlePlayGame({id: g.id, title: g.title, file: g.file})} className="w-[160px] h-[160px] rounded-lg overflow-hidden border-[3px] border-transparent hover:border-green-500 focus:border-green-500 focus:outline-none flex-shrink-0 group cursor-pointer flex-col relative transition-all duration-300 ease-out hover:scale-110 focus:scale-110 hover:shadow-[0_0_20px_rgba(34,197,94,0.6)] focus:shadow-[0_0_20px_rgba(34,197,94,0.6)] hover:z-10 focus:z-10">
                       <img src={g.image} className="w-full h-full object-cover group-hover:scale-105 group-focus:scale-105 transition-transform" />
                     </div>
                   ))}
 
-                  <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('settings')} onClick={() => setCurrentView('settings')} className="w-[160px] h-[160px] bg-zinc-800/90 rounded-lg flex flex-col justify-center items-center border-[3px] border-transparent hover:border-green-500 focus:border-green-500 group cursor-pointer flex-shrink-0 transition-colors">
+                  <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('settings')} onClick={() => setCurrentView('settings')} className="w-[160px] h-[160px] bg-zinc-800/90 rounded-lg flex flex-col justify-center items-center border-[3px] border-transparent hover:border-green-500 focus:border-green-500 focus:outline-none group cursor-pointer flex-shrink-0 transition-all duration-300 ease-out hover:scale-110 focus:scale-110 hover:shadow-[0_0_20px_rgba(34,197,94,0.6)] focus:shadow-[0_0_20px_rgba(34,197,94,0.6)] hover:z-10 focus:z-10">
                     <Settings size={48} className="text-zinc-300 group-hover:text-white group-focus:text-white transition-colors mb-2" />
                     <span className="font-semibold text-sm text-white">Settings</span>
                   </div>
 
-                  <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('friends')} onClick={() => setCurrentView('friends')} className="w-[160px] h-[160px] bg-purple-600 rounded-lg flex flex-col justify-center items-center border-[3px] border-transparent hover:border-green-500 focus:border-green-500 group cursor-pointer flex-shrink-0 transition-colors">
+                  <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('friends')} onClick={() => setCurrentView('friends')} className="w-[160px] h-[160px] bg-purple-600 rounded-lg flex flex-col justify-center items-center border-[3px] border-transparent hover:border-green-500 focus:border-green-500 focus:outline-none group cursor-pointer flex-shrink-0 transition-all duration-300 ease-out hover:scale-110 focus:scale-110 hover:shadow-[0_0_20px_rgba(34,197,94,0.6)] focus:shadow-[0_0_20px_rgba(34,197,94,0.6)] hover:z-10 focus:z-10">
                     <Users size={48} className="text-white mb-2" />
                     <span className="font-semibold text-sm text-white">Friends</span>
                   </div>
 
-                  <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('activity')} onClick={() => setCurrentView('activity')} className="w-[160px] h-[160px] bg-blue-600 rounded-lg flex flex-col justify-center items-center border-[3px] border-transparent hover:border-green-500 focus:border-green-500 group cursor-pointer flex-shrink-0 transition-colors">
+                  <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('activity')} onClick={() => setCurrentView('activity')} className="w-[160px] h-[160px] bg-blue-600 rounded-lg flex flex-col justify-center items-center border-[3px] border-transparent hover:border-green-500 focus:border-green-500 focus:outline-none group cursor-pointer flex-shrink-0 transition-all duration-300 ease-out hover:scale-110 focus:scale-110 hover:shadow-[0_0_20px_rgba(34,197,94,0.6)] focus:shadow-[0_0_20px_rgba(34,197,94,0.6)] hover:z-10 focus:z-10">
                     <Flame size={48} className="text-white mb-2 group-hover:text-yellow-400 transition-colors" />
                     <span className="font-semibold text-sm text-white">Activity</span>
                   </div>
 
-                  <div tabIndex={0} className="w-[160px] h-[160px] bg-zinc-200 rounded-lg flex flex-col justify-center items-center border-[3px] border-transparent hover:border-white focus:border-green-500 group cursor-pointer flex-shrink-0 transition-colors">
+                  <div tabIndex={0} className="w-[160px] h-[160px] bg-zinc-200 rounded-lg flex flex-col justify-center items-center border-[3px] border-transparent hover:border-white focus:border-green-500 focus:outline-none group cursor-pointer flex-shrink-0 transition-all duration-300 ease-out hover:scale-110 focus:scale-110 hover:shadow-[0_0_20px_rgba(34,197,94,0.6)] focus:shadow-[0_0_20px_rgba(34,197,94,0.6)] hover:z-10 focus:z-10">
                     <Store size={48} className="text-zinc-800 mb-2 group-hover:scale-105 transition-transform" />
                     <span className="font-semibold text-sm text-zinc-900">Store</span>
                   </div>
@@ -928,7 +928,7 @@ export default function App() {
                       {suspendedGames.map((sg) => {
                         const gameData = ALL_GAMES.find(g => g.id === sg.game.id);
                         return (
-                          <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handlePlayGame(sg.game)} key={sg.game.id} onClick={() => handlePlayGame(sg.game)} className="w-[200px] h-[120px] rounded-lg overflow-hidden border-[3px] border-transparent hover:border-green-500 focus:border-green-500 flex-shrink-0 group cursor-pointer flex-col transition-colors relative bg-zinc-800 shadow-lg">
+                          <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handlePlayGame(sg.game)} key={sg.game.id} onClick={() => handlePlayGame(sg.game)} className="w-[200px] h-[120px] rounded-lg overflow-hidden border-[3px] border-transparent hover:border-green-500 focus:border-green-500 focus:outline-none flex-shrink-0 group cursor-pointer flex-col relative bg-zinc-800 transition-all duration-300 ease-out hover:scale-110 focus:scale-110 hover:shadow-[0_0_20px_rgba(34,197,94,0.6)] focus:shadow-[0_0_20px_rgba(34,197,94,0.6)] hover:z-10 focus:z-10">
                             {gameData?.image && <img src={gameData.image} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 group-hover:scale-105 transition-all" />}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex flex-col justify-end p-3">
                               <span className="font-bold text-sm text-white line-clamp-1">{sg.game.title}</span>
