@@ -19,6 +19,7 @@ export interface FriendRequest {
   toUid: string;
   status: 'pending' | 'accepted' | 'rejected';
   createdAt: string;
+  imageUrl?: string;
 }
 
 export interface ChatMessage {
@@ -26,4 +27,5 @@ export interface ChatMessage {
   senderId: string;
   text: string;
   createdAt: string;
+  imageUrl?: string;
 }

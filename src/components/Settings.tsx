@@ -266,6 +266,29 @@ export function Settings({ profile, onBack, onLogout, isGuestMode }: { profile: 
             </div>
 
             <div>
+              <h3 className="text-xl font-bold mb-4">System</h3>
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between p-4 bg-black/40 rounded-lg">
+                  <div>
+                    <span className="font-bold">Clear Cache</span>
+                    <p className="text-xs text-zinc-400">Fixes most loading issues. App will reload.</p>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      if (confirm('Are you sure you want to clear the cache? You will not be signed out, but app settings may reset.')) {
+                        sessionStorage.clear();
+                        window.location.reload();
+                      }
+                    }}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-md text-sm font-bold transition-colors"
+                  >
+                    Clear Cache
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div>
               <h3 className="text-xl font-bold mb-4">Notifications</h3>
               <div className="flex flex-col gap-4">
                 <label className="flex items-center justify-between p-4 bg-black/40 rounded-lg cursor-pointer">

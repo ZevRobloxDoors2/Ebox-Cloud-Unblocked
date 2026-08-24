@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { ChevronLeft, Send } from 'lucide-react';
+import { ChevronLeft, Send, MoreVertical, Edit2, Trash2, X , Image as ImageIcon } from 'lucide-react';
 import { UserProfile, ChatMessage } from '../types';
 import { db } from '../firebase';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 
 interface ChatProps {
   key?: string;
@@ -19,7 +19,11 @@ interface ChatProps {
 export function Chat({ userProfile, friendId, friendGamertag, chatId: propChatId, isGroup, chatName, onBack }: ChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [editingMsg, setEditingMsg] = useState<string | null>(null);
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Generate stable chat ID
@@ -37,17 +41,96 @@ export function Chat({ userProfile, friendId, friendGamertag, chatId: propChatId
     return () => unsubscribe();
   }, [computedChatId]);
 
+  const handleEdit = async (msgId: string, newText: string) => {
+    if (!newText.trim() || newText.length > 1000) return;
+    try {
+      await updateDoc(doc(db, `chats/${computedChatId}/messages`, msgId), {
+        text: newText.trim(),
+        editedAt: serverTimestamp()
+      });
+      setEditingMsg(null);
+      setText('');
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDelete = async (msgId: string) => {
+    if (!confirm('Are you sure you want to delete this message?')) return;
+    try {
+      await deleteDoc(doc(db, `chats/${computedChatId}/messages`, msgId));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Image must be under 5MB');
+        return;
+      }
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onload = (ev) => setImagePreview(ev.target?.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const processImage = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const maxDim = 800;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round(height * maxDim / width);
+              width = maxDim;
+            } else {
+              width = Math.round(width * maxDim / height);
+              height = maxDim;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.6));
+        };
+        img.src = e.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!text.trim() || text.length > 1000) return;
+    if ((!text.trim() && !imageFile) || text.length > 1000) return;
+    if (editingMsg) {
+      handleEdit(editingMsg, text);
+      return;
+    }
     setSending(true);
     try {
-      await addDoc(collection(db, `chats/${computedChatId}/messages`), {
+      let b64Image = null;
+      if (imageFile) {
+        b64Image = await processImage(imageFile);
+      }
+      const msgData: any = {
         senderId: userProfile.uid,
         senderName: userProfile.gamertag,
         text: text.trim(),
         createdAt: serverTimestamp()
-      });
+      };
+      if (b64Image) msgData.imageUrl = b64Image;
+      
+      await addDoc(collection(db, `chats/${computedChatId}/messages`), msgData);
       
       // Notify recipients
       import('firebase/firestore').then(async ({ getDoc, doc }) => {
@@ -86,6 +169,8 @@ export function Chat({ userProfile, friendId, friendGamertag, chatId: propChatId
       });
       
       setText('');
+      setImageFile(null);
+      setImagePreview(null);
     } catch(e: any) {
       alert("Error: " + e.message);
     } finally {
@@ -136,15 +221,47 @@ export function Chat({ userProfile, friendId, friendGamertag, chatId: propChatId
             </div>
           ) : (
             messages.map(m => {
+              const isEditing = editingMsg === m.id;
+              const showMenu = activeMenuId === m.id;
               const isMe = m.senderId === userProfile.uid;
               return (
-                <div key={m.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[70%] px-4 py-3 rounded-2xl ${isMe ? 'bg-green-600 text-white rounded-br-sm' : 'bg-zinc-800 text-zinc-200 rounded-bl-sm'}`}>
+                <div key={m.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} group relative`}>
+                  <div className={`max-w-[70%] px-4 py-3 rounded-2xl ${isMe ? 'bg-green-600 text-white rounded-br-sm' : 'bg-zinc-800 text-zinc-200 rounded-bl-sm'} relative`}>
                     {isGroup && !isMe && <p className="text-[11px] text-green-400 font-bold mb-1 opacity-80">{m.senderName || 'User'}</p>}
-                    <p className="break-words leading-relaxed text-[15px]">{m.text}</p>
+                    {(m as any).imageUrl && (
+                      <div className="mb-2">
+                        <a href={(m as any).imageUrl} target="_blank" rel="noopener noreferrer">
+                          <img src={(m as any).imageUrl} className="max-w-full max-h-64 rounded-md object-contain cursor-zoom-in" />
+                        </a>
+                      </div>
+                    )}
+                    {m.text && (
+                      <p className="break-words leading-relaxed text-[15px]">
+                        {m.text}
+                        {(m as any).editedAt && <span className="text-[10px] opacity-60 ml-2 italic">(edited)</span>}
+                      </p>
+                    )}
                     <span className={`text-[10px] opacity-60 block mt-1 ${isMe ? 'text-right' : 'text-left'}`}>
-                      {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                     </span>
+                    
+                    {isMe && (
+                      <div className={`absolute top-1/2 -translate-y-1/2 ${isMe ? '-left-8' : '-right-8'} opacity-0 group-hover:opacity-100 transition-opacity`}>
+                        <button onClick={() => setActiveMenuId(showMenu ? null : m.id)} className="p-1 text-zinc-400 hover:text-white transition-colors">
+                          <MoreVertical size={16} />
+                        </button>
+                        {showMenu && (
+                          <div className="absolute right-full top-0 mr-2 bg-zinc-800 border border-zinc-700 rounded-md shadow-xl py-1 z-10 w-24">
+                            <button onClick={() => { setEditingMsg(m.id); setText(m.text); setActiveMenuId(null); }} className="w-full text-left px-3 py-1.5 text-sm hover:bg-zinc-700 flex items-center gap-2">
+                              <Edit2 size={14} /> Edit
+                            </button>
+                            <button onClick={() => { handleDelete(m.id); setActiveMenuId(null); }} className="w-full text-left px-3 py-1.5 text-sm hover:bg-red-500/20 text-red-400 hover:text-red-300 flex items-center gap-2">
+                              <Trash2 size={14} /> Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -153,22 +270,41 @@ export function Chat({ userProfile, friendId, friendGamertag, chatId: propChatId
         </div>
         
         <div className="p-4 bg-zinc-900 border-t border-white/10 shrink-0">
-          <form onSubmit={handleSend} className="flex gap-2">
-            <input 
-              type="text" 
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Type a message..."
-              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-full px-5 py-3 text-white focus:outline-none focus:border-green-500"
-            />
-            <button 
-              disabled={sending || !text.trim()} 
-              type="submit" 
-              className="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white p-3 w-12 h-12 rounded-full flex items-center justify-center transition-colors"
-            >
-              <Send size={20} className="ml-[-2px]" />
-            </button>
-          </form>
+          <div className="flex flex-col gap-2 w-full">
+            {imagePreview && (
+              <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-zinc-700">
+                <img src={imagePreview} className="w-full h-full object-cover" />
+                <button type="button" onClick={() => { setImageFile(null); setImagePreview(null); }} className="absolute top-1 right-1 bg-black/60 p-1 rounded-full text-white hover:bg-black">
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+            <form onSubmit={handleSend} className="flex gap-2 items-center">
+              <label className="bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white p-3 w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-colors shrink-0">
+                <ImageIcon size={20} />
+                <input type="file" accept="image/*" onChange={handleImageSelect} className="hidden" disabled={!!editingMsg} />
+              </label>
+              <input 
+                type="text" 
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder={editingMsg ? "Edit message..." : "Type a message..."}
+                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-full px-5 py-3 text-white focus:outline-none focus:border-green-500 min-w-0"
+              />
+              {editingMsg && (
+                <button type="button" onClick={() => { setEditingMsg(null); setText(''); }} className="bg-zinc-700 hover:bg-zinc-600 text-white p-3 w-12 h-12 rounded-full flex items-center justify-center transition-colors shrink-0">
+                  <X size={20} />
+                </button>
+              )}
+              <button 
+                disabled={sending || (!text.trim() && !imageFile)} 
+                type="submit" 
+                className="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white p-3 w-12 h-12 rounded-full flex items-center justify-center transition-colors shrink-0"
+              >
+                <Send size={20} className="ml-[-2px]" />
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </motion.div>

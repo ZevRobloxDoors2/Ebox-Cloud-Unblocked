@@ -12,6 +12,7 @@ interface GlobalNotificationsProps {
 }
 
 export function GlobalNotifications({ profile, playingGame, onNavigateToChat, onNavigateToParty }: GlobalNotificationsProps) {
+  useEffect(() => { if (Notification.permission === 'default') { Notification.requestPermission(); } }, []);
   const [activeToasts, setActiveToasts] = useState<any[]>([]);
 
   useEffect(() => {
@@ -30,6 +31,12 @@ export function GlobalNotifications({ profile, playingGame, onNavigateToChat, on
           if (dnd && playingGame) return;
 
           setActiveToasts(prev => [...prev, { id: notifId, ...data }]);
+          
+          if (Notification.permission === 'granted') {
+            const title = data.type === 'message' ? (data.isGroup ? `New message in ${data.chatName}` : `New message from ${data.fromGamertag}`) : `Party Invite from ${data.fromGamertag}`;
+            const body = data.type === 'message' ? 'Click to open chat' : 'Click to join party';
+            new Notification(title, { body });
+          }
           
           setTimeout(() => {
             setActiveToasts(prev => prev.filter(t => t.id !== notifId));
