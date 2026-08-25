@@ -4,13 +4,18 @@ import path from 'path';
 import {defineConfig, loadEnv} from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 
-export default defineConfig(({mode}) => {
+export default defineConfig(({mode, command}) => {
   const env = loadEnv(mode, '.', '');
   const isGitHubPages = process.env.GITHUB_PAGES === 'true';
   
+  const plugins = [react(), tailwindcss()];
+  if (command === 'build') {
+    plugins.push(viteSingleFile());
+  }
+  
   return {
     base: isGitHubPages ? '/Ebox-Cloud-Unblocked/' : './',
-    plugins: [react(), tailwindcss(), viteSingleFile()],
+    plugins,
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },

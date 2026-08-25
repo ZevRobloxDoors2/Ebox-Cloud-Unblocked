@@ -848,7 +848,7 @@ export default function App() {
                     >
                       E
                     </motion.button>
-                    <button onClick={handleStopGame} className="bg-red-600 px-4 py-1.5 rounded-md font-bold hover:bg-red-500 transition-colors flex items-center gap-2">
+                    <button onClick={() => window.open(getUrl(playingGame.file, 0), "_blank")} className="bg-zinc-700 px-4 py-1.5 text-sm rounded-md font-bold hover:bg-zinc-600 transition-colors flex items-center gap-2">Open in New Tab</button><button onClick={handleStopGame} className="bg-red-600 px-4 py-1.5 rounded-md font-bold hover:bg-red-500 transition-colors flex items-center gap-2">
                        Stop Game
                     </button>
                   </div>

@@ -289,8 +289,30 @@ export const ALL_GAMES = [
     "title": "TikTok",
     "image": "https://upload.wikimedia.org/wikipedia/en/a/a9/TikTok_logo.svg",
     "type": "app",
-    "file": "https://nhjkdbiondnnd.dila.cl/embed.html#https://tiktok.com"
+    "file": "https://opium.best/~/7dm8ml54/hudiigjq/https%3A%2F%2Fwww.tiktok.com%2Fforyou"
   },
+  {
+    "id": "GTA V",
+    "title": "GTA V",
+    "image": "https://ui-avatars.com/api/?name=GTA+V&background=random&color=fff&size=256&font-size=0.33",
+    "type": "game",
+    "file": "https://opium.best/"
+  },
+  {
+    "id": "GTA San Andreas",
+    "title": "GTA San Andreas",
+    "image": "https://ui-avatars.com/api/?name=GTA+SA&background=random&color=fff&size=256&font-size=0.33",
+    "type": "game",
+    "file": "https://truffled.lol/games/gtasan/"
+  },
+  {
+    "id": "Instagram",
+    "title": "Instagram",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/e/e7/Instagram_logo_2016.svg",
+    "type": "app",
+    "file": "https://opium.best/~/7dm8ml54/hudiigjq/https%3A%2F%2Fwww.instagram.com%2F"
+  },
+
   {
     "id": "Snapchat",
     "title": "Snapchat",
