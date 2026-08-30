@@ -8,9 +8,11 @@ type GuideMenuProps = {
   onClose: () => void;
   recentGames: any[];
   onNavigate: (view: string, props?: any) => void;
+  playingGame?: any;
+  onStopGame?: () => void;
 };
 
-export function GuideMenu({ isOpen, onClose, recentGames, onNavigate }: GuideMenuProps) {
+export function GuideMenu({ isOpen, onClose, recentGames, onNavigate, playingGame, onStopGame }: GuideMenuProps) {
   const [musicState, setMusicState] = useState({
     isPlaying: false,
     track: '',
@@ -115,6 +117,19 @@ export function GuideMenu({ isOpen, onClose, recentGames, onNavigate }: GuideMen
                   <span className="font-medium">Ebox Music</span>
                 </button>
               </div>
+
+              {playingGame && (
+                <div className="flex flex-col gap-2 pt-2 border-t border-white/10 mt-2">
+                  <div className="px-3 pb-2 text-sm font-semibold text-green-400">Now Playing: {playingGame.title}</div>
+                  <button 
+                    onClick={() => handleAction(() => { if (onStopGame) onStopGame(); })}
+                    className="flex items-center gap-3 p-3 rounded-md bg-red-600/20 text-red-400 hover:bg-red-600/40 transition-colors text-left focus:ring-2 focus:ring-red-500 focus:outline-none"
+                  >
+                    <Gamepad2 size={20} />
+                    <span className="font-bold">Quit Game</span>
+                  </button>
+                </div>
+              )}
 
               <div className="flex flex-col gap-3">
                 <span className="text-sm font-semibold text-zinc-400 uppercase tracking-wider px-3">Recent Games</span>

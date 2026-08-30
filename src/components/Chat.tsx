@@ -25,21 +25,50 @@ export function Chat({ userProfile, friendId, friendGamertag, chatId: propChatId
   const [editingMsg, setEditingMsg] = useState<string | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [typingUsers, setTypingUsers] = useState<Record<string, { gamertag: string, lastTyped: number }>>({});
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Generate stable chat ID
   const computedChatId = isGroup && propChatId ? propChatId : [userProfile.uid, friendId].sort().join('_');
   const displayTitle = isGroup ? chatName : (friendGamertag === 'Friend' ? friendId?.substring(0,8) : friendGamertag);
 
   useEffect(() => {
+    const qTyping = query(collection(db, `chats/${computedChatId}/typing`));
+    const unsubTyping = onSnapshot(qTyping, (snap) => {
+      const now = Date.now();
+      const typing: Record<string, any> = {};
+      snap.docs.forEach(doc => {
+        if (doc.id !== userProfile.uid) {
+           const data = doc.data();
+           if (data.isTyping && (now - data.lastTyped) < 5000) {
+              typing[doc.id] = data;
+           }
+        }
+      });
+      setTypingUsers(typing);
+    });
+
     const q = query(collection(db, `chats/${computedChatId}/messages`), orderBy('createdAt', 'asc'));
     const unsubscribe = onSnapshot(q, (snap) => {
-      setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() } as ChatMessage)));
+      const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() } as ChatMessage));
+      setMessages(msgs);
       setTimeout(() => {
         if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
       }, 100);
+      
+      // Mark as read
+      msgs.forEach(m => {
+        if (m.senderId !== userProfile.uid && (!m.readBy || (!m.readBy.includes(userProfile.uid) && !m.readBy.includes(userProfile.gamertag)))) {
+           import('firebase/firestore').then(({ updateDoc, doc, arrayUnion }) => {
+              updateDoc(doc(db, `chats/${computedChatId}/messages`, m.id), {
+                 readBy: arrayUnion(userProfile.gamertag)
+              }).catch(() => {});
+           });
+        }
+      });
     });
-    return () => unsubscribe();
-  }, [computedChatId]);
+    return () => { unsubscribe(); unsubTyping(); };
+  }, [computedChatId, userProfile.uid]);
 
   const handleEdit = async (msgId: string, newText: string) => {
     if (!newText.trim() || newText.length > 1000) return;
@@ -241,8 +270,16 @@ export function Chat({ userProfile, friendId, friendGamertag, chatId: propChatId
                         {(m as any).editedAt && <span className="text-[10px] opacity-60 ml-2 italic">(edited)</span>}
                       </p>
                     )}
+                    {isMe && m.readBy && m.readBy.filter(r => r !== userProfile.uid && r !== userProfile.gamertag).length > 0 && (
+                      <div className="absolute -bottom-4 right-0 text-[10px] text-green-400 font-semibold flex flex-col items-end opacity-80 whitespace-nowrap z-10">
+                         <span className="flex items-center gap-1">✓ Read {isGroup ? 'by' : ''}</span>
+                         {isGroup && (
+                            <span className="text-[9px] text-zinc-400">{m.readBy.filter(r => r !== userProfile.uid && r !== userProfile.gamertag).join(', ')}</span>
+                         )}
+                      </div>
+                    )}
                     <span className={`text-[10px] opacity-60 block mt-1 ${isMe ? 'text-right' : 'text-left'}`}>
-                      {m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                      {m.createdAt ? (m.createdAt.toDate ? m.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (typeof m.createdAt === 'number' || typeof m.createdAt === 'string' ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '')) : ''}
                     </span>
                     
                     {isMe && (
@@ -269,6 +306,17 @@ export function Chat({ userProfile, friendId, friendGamertag, chatId: propChatId
           )}
         </div>
         
+        {Object.keys(typingUsers).length > 0 && (
+          <div className="px-6 py-2 text-xs text-zinc-400 italic bg-zinc-900 flex items-center gap-2">
+            <div className="flex gap-1">
+               <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+               <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+               <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+            {Object.values(typingUsers).map(u => (u as any).gamertag).join(', ')} {Object.values(typingUsers).length === 1 ? 'is' : 'are'} typing...
+          </div>
+        )}
+
         <div className="p-4 bg-zinc-900 border-t border-white/10 shrink-0">
           <div className="flex flex-col gap-2 w-full">
             {imagePreview && (
@@ -287,7 +335,22 @@ export function Chat({ userProfile, friendId, friendGamertag, chatId: propChatId
               <input 
                 type="text" 
                 value={text}
-                onChange={(e) => setText(e.target.value)}
+                onChange={(e) => {
+                  setText(e.target.value);
+                  import('firebase/firestore').then(({ setDoc, doc }) => {
+                    setDoc(doc(db, `chats/${computedChatId}/typing`, userProfile.uid), {
+                      gamertag: userProfile.gamertag,
+                      isTyping: e.target.value.length > 0,
+                      lastTyped: Date.now()
+                    }, { merge: true });
+                  });
+                  if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                  typingTimeoutRef.current = setTimeout(() => {
+                    import('firebase/firestore').then(({ setDoc, doc }) => {
+                      setDoc(doc(db, `chats/${computedChatId}/typing`, userProfile.uid), { isTyping: false }, { merge: true });
+                    });
+                  }, 2000);
+                }}
                 placeholder={editingMsg ? "Edit message..." : "Type a message..."}
                 className="flex-1 bg-zinc-800 border border-zinc-700 rounded-full px-5 py-3 text-white focus:outline-none focus:border-green-500 min-w-0"
               />

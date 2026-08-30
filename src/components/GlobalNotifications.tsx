@@ -7,11 +7,12 @@ import { UserProfile } from '../types';
 interface GlobalNotificationsProps {
   profile: UserProfile | null;
   playingGame: boolean;
+  activeChatId?: string | null;
   onNavigateToChat: (chatId: string, isGroup: boolean, name: string) => void;
   onNavigateToParty: (partyId: string) => void;
 }
 
-export function GlobalNotifications({ profile, playingGame, onNavigateToChat, onNavigateToParty }: GlobalNotificationsProps) {
+export function GlobalNotifications({ profile, playingGame, activeChatId, onNavigateToChat, onNavigateToParty }: GlobalNotificationsProps) {
   useEffect(() => { if (Notification.permission === 'default') { Notification.requestPermission(); } }, []);
   const [activeToasts, setActiveToasts] = useState<any[]>([]);
 
@@ -29,6 +30,19 @@ export function GlobalNotifications({ profile, playingGame, onNavigateToChat, on
           
           if (muteAll) return;
           if (dnd && playingGame) return;
+          
+          // Don't toast if we're actively looking at this chat
+          // Prevent spam: only toast new group chat messages or unread DMs
+          if (data.type === 'message') {
+            if (data.isGroup && (Date.now() - (data.createdAt?.toMillis() || Date.now()) > 10000)) {
+               // Ignore old group chat messages when opening app
+               return;
+            }
+            if (data.chatId === activeChatId || data.fromUid === activeChatId) {
+               updateDoc(doc(db, 'notifications', notifId), { read: true }).catch(() => {});
+               return;
+            }
+          }
 
           setActiveToasts(prev => [...prev, { id: notifId, ...data }]);
           

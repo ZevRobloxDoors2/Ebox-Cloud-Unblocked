@@ -58,8 +58,8 @@ export default function App() {
   
   useEffect(() => {
     // Tab Cloak
-    const title = localStorage.getItem('cloak_title');
-    const icon = localStorage.getItem('cloak_icon');
+    const title = localStorage.getItem('cloak_title') || 'Classes';
+    const icon = localStorage.getItem('cloak_icon') || 'https://ssl.gstatic.com/classroom/favicon.png';
     if (title) document.title = title;
     if (icon) {
       let link = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
@@ -110,6 +110,57 @@ export default function App() {
     `;
     document.head.appendChild(style);
     return () => style.remove();
+  }, []);
+
+
+  // Panic Button Hook
+  useEffect(() => {
+    const handlePanic = (e) => {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || (activeEl as HTMLElement).isContentEditable)) return;
+      
+      const panicKey = localStorage.getItem('panic_key') || '`';
+      if (e.key === panicKey) {
+        window.location.replace("https://classroom.google.com");
+      }
+    };
+    window.addEventListener('keydown', handlePanic);
+    return () => window.removeEventListener('keydown', handlePanic);
+  }, []);
+
+  // Custom Cursor Mode
+  const [cursorCss, setCursorCss] = useState('');
+  useEffect(() => {
+    const updateCursor = () => {
+      if (localStorage.getItem('custom_cursor') !== 'false') {
+        const preset = localStorage.getItem('cursor_preset') || 'crosshair';
+        let url = "url('https://cdn-icons-png.flaticon.com/512/3143/3143160.png') 16 16, auto";
+        if (preset === 'default') url = "url('https://cdn-icons-png.flaticon.com/512/2722/2722237.png') 16 16, auto";
+        if (preset === 'gaming') url = "url('https://cdn-icons-png.flaticon.com/512/751/751463.png') 16 16, auto";
+        
+        // Also apply cursor to iframes by overriding their pointer events conceptually or applying it to wrapping containers
+        setCursorCss(`
+          *, *::before, *::after, button, a, input, select { 
+            cursor: ${url} !important; 
+          }
+        `);
+      } else {
+        setCursorCss('');
+      }
+    };
+    window.addEventListener('storage', updateCursor);
+    updateCursor();
+    const interval = setInterval(updateCursor, 1000);
+    return () => { clearInterval(interval); window.removeEventListener('storage', updateCursor); };
+  }, []);
+
+  // IDE Mode tracking
+  const [ideMode, setIdeMode] = useState(localStorage.getItem('ide_mode') === 'true');
+  useEffect(() => {
+    const i = setInterval(() => {
+      setIdeMode(localStorage.getItem('ide_mode') === 'true');
+    }, 1000);
+    return () => clearInterval(i);
   }, []);
 
   useSpatialNavigation();
@@ -243,8 +294,8 @@ export default function App() {
       <html>
       <head>
         <style>body,html{margin:0;padding:0;height:100%;overflow:hidden;}</style>
-        <title>${localStorage.getItem('cloak_title') || 'Google'}</title>
-        <link rel="icon" href="${localStorage.getItem('cloak_icon') || 'https://www.google.com/favicon.ico'}">
+        <title>${localStorage.getItem('cloak_title') || 'Classes'}</title>
+        <link rel="icon" href="${localStorage.getItem('cloak_icon') || 'https://ssl.gstatic.com/classroom/favicon.png'}">
       </head>
       <body>
         <iframe src="${window.location.href}" style="border:none;width:100%;height:100%;margin:0;padding:0;"></iframe>
@@ -477,11 +528,21 @@ export default function App() {
   }, [playingGame, profile]);
 
   if (!startupDone) {
-    return <StartupAnimation onComplete={handleStartupComplete} />;
+    return (
+      <>
+        <style>{cursorCss}</style>
+        <StartupAnimation onComplete={handleStartupComplete} />
+      </>
+    );
   }
 
   if (!authLoaded) {
-    return <div className="min-h-screen bg-black flex items-center justify-center text-white"><div className="w-8 h-8 border-4 border-zinc-800 border-t-green-500 rounded-full animate-spin"></div></div>;
+    return (
+      <>
+        <style>{cursorCss}</style>
+        <div className="min-h-screen bg-black flex items-center justify-center text-white"><div className="w-8 h-8 border-4 border-zinc-800 border-t-green-500 rounded-full animate-spin"></div></div>
+      </>
+    );
   }
 
   if (!isGuestMode && !activeSessionConfirmed) {
@@ -516,33 +577,50 @@ export default function App() {
 
   return (
     <>
+      <style>{cursorCss}</style>
       <DMCAModal />
-      <GlobalNotifications profile={activeProfile} playingGame={!!playingGame} onNavigateToChat={(id, isGroup, name) => { setChatConfig({id, name, isGroup}); setCurrentView('chat'); }} onNavigateToParty={(id) => { setActivePartyId(id); setCurrentView('party'); }} />
-      <div className={`h-screen ${getThemeClasses(activeProfile.homeTheme)} text-white font-sans overflow-hidden flex flex-col relative z-0`}>
+      <GlobalNotifications profile={activeProfile} playingGame={!!playingGame} activeChatId={currentView === 'chat' && chatConfig ? (chatConfig.isGroup ? chatConfig.id : chatConfig.id) : null} onNavigateToChat={(id, isGroup, name) => { setChatConfig({id, name, isGroup}); setCurrentView('chat'); }} onNavigateToParty={(id) => { setActivePartyId(id); setCurrentView('party'); }} />
+      <div className={`h-screen ${ideMode ? "bg-[#1e1e1e]" : getThemeClasses(activeProfile.homeTheme)} text-white font-sans overflow-hidden flex flex-col relative z-0`}>
+      {ideMode && (
+        <div className="flex h-full w-full absolute inset-0 z-0 pointer-events-none">
+          <div className="w-64 bg-[#252526] border-r border-[#333333] flex flex-col">
+            <div className="h-9 flex items-center px-4 text-[11px] text-[#cccccc] uppercase tracking-wider font-semibold">Explorer</div>
+            <div className="px-4 py-1 text-sm text-[#cccccc] flex items-center gap-2"><ChevronDown size={14}/> PROJECT</div>
+            <div className="px-8 py-1 text-sm text-[#4af626] bg-[#37373d]">index.html</div>
+            <div className="px-8 py-1 text-sm text-[#cccccc]">style.css</div>
+            <div className="px-8 py-1 text-sm text-[#cccccc]">app.js</div>
+          </div>
+          <div className="flex-1 flex flex-col bg-[#1e1e1e]">
+            <div className="h-9 bg-[#2d2d2d] flex items-center">
+              <div className="px-4 h-full bg-[#1e1e1e] border-t-2 border-[#4af626] text-[#4af626] flex items-center text-sm">index.html</div>
+            </div>
+            <div className="flex-1 relative">
+            </div>
+          </div>
+        </div>
+      )}
+      <div className={`flex-1 flex flex-col ${ideMode ? "ml-64 mt-9" : ""} relative z-10`}>
         <WelcomeMessage />
         <div className="fixed inset-0 z-[-1] opacity-50">
           <div className="absolute inset-0 bg-gradient-to-tr from-black/80 via-transparent to-black/40" />
         </div>
 
-        {!playingGame && (
-          <motion.button 
-            layoutId="guide-button"
-            onClick={() => setIsGuideOpen(true)}
-            className="fixed top-8 right-8 z-[260] w-12 h-12 rounded-full bg-green-500 hover:bg-green-400 text-black font-bold text-xl flex items-center justify-center shadow-lg transition-transform hover:scale-105"
-          >
-            E
-          </motion.button>
-        )}
+        <motion.button 
+          layoutId="guide-button"
+          onClick={() => setIsGuideOpen(true)}
+          className="fixed top-8 right-8 z-[260] w-12 h-12 rounded-full bg-green-500 hover:bg-green-400 text-black font-bold text-xl flex items-center justify-center shadow-lg transition-transform hover:scale-105 opacity-50 hover:opacity-100"
+        >
+          E
+        </motion.button>
 
         <EboxMusicToast />
         <GuideMenu 
           isOpen={isGuideOpen} 
           onClose={() => setIsGuideOpen(false)} 
           recentGames={activeProfile.recentGames || []}
+          playingGame={playingGame}
+          onStopGame={handleStopGame}
           onNavigate={(view) => {
-            if (playingGame && view !== 'home') {
-               setPlayingGame(null); // Optionally exit game when navigating away
-            }
             setCurrentView(view as View);
           }}
         />
@@ -837,23 +915,7 @@ export default function App() {
                   </motion.div>
                 )}
               </AnimatePresence>
-              {playingGame && (
-                <div className="h-12 bg-zinc-900 flex items-center justify-between px-4 shrink-0 shadow-md">
-                  <span className="font-bold text-green-400">Playing {playingGame.title} ({playMinutes}m) - Earned: {Math.floor(playMinutes / 2) * 10} 🏆</span>
-                  <div className="flex items-center gap-4">
-                    <motion.button 
-                      layoutId="guide-button"
-                      onClick={() => setIsGuideOpen(true)}
-                      className="z-[260] w-8 h-8 rounded-full bg-green-500 hover:bg-green-400 text-black font-bold flex items-center justify-center shadow-lg transition-transform hover:scale-105"
-                    >
-                      E
-                    </motion.button>
-                    <button onClick={() => window.open(getUrl(playingGame.file, 0), "_blank")} className="bg-zinc-700 px-4 py-1.5 text-sm rounded-md font-bold hover:bg-zinc-600 transition-colors flex items-center gap-2">Open in New Tab</button><button onClick={handleStopGame} className="bg-red-600 px-4 py-1.5 rounded-md font-bold hover:bg-red-500 transition-colors flex items-center gap-2">
-                       Stop Game
-                    </button>
-                  </div>
-                </div>
-              )}
+
               
               {(() => {
                 const allActive = [...suspendedGames.map(s => s.game)];
@@ -867,6 +929,20 @@ export default function App() {
                       <div className="absolute inset-0 pointer-events-none z-[105]" style={{ backgroundImage: 'url(https://upload.wikimedia.org/wikipedia/commons/c/c3/Google_Docs_logo_%282014-2020%29.svg)', backgroundRepeat: 'repeat', opacity: 0.1 }} />
                     )}
 
+
+                    {g.id === 'GTA V' && playingGame?.id === g.id && !isLoadingGame && (
+                      <div className="absolute top-4 left-4 z-[200] bg-zinc-900 border-2 border-red-500 p-4 rounded-lg shadow-2xl max-w-sm pointer-events-auto">
+                        <div className="flex justify-between items-start mb-2">
+                          <h3 className="text-red-400 font-bold">GTA V Launch Instructions:</h3>
+                        </div>
+                        <ol className="text-sm text-white list-decimal list-inside space-y-2 mb-2">
+                          <li>Click <strong>Library</strong> on the bottom right corner.</li>
+                          <li>Click the <strong>Cloud</strong> button in the search bar.</li>
+                          <li>Search up <strong>Grand</strong>.</li>
+                          <li>Click on <strong>GTA V</strong>.</li>
+                        </ol>
+                      </div>
+                    )}
                     <iframe 
                     key={g.id}
                     src={getUrl(g.file, idx)} 
@@ -913,10 +989,8 @@ export default function App() {
                     <span className="font-semibold text-sm text-white">Activity</span>
                   </div>
 
-                  <div tabIndex={0} className="w-[160px] h-[160px] bg-zinc-200 rounded-lg flex flex-col justify-center items-center border-[3px] border-transparent hover:border-white focus:border-green-500 focus:outline-none group cursor-pointer flex-shrink-0 transition-all duration-300 ease-out hover:scale-110 focus:scale-110 hover:shadow-[0_0_20px_rgba(34,197,94,0.6)] focus:shadow-[0_0_20px_rgba(34,197,94,0.6)] hover:z-10 focus:z-10">
-                    <Store size={48} className="text-zinc-800 mb-2 group-hover:scale-105 transition-transform" />
-                    <span className="font-semibold text-sm text-zinc-900">Store</span>
-                  </div>
+
+                    
                 </div>
 
                 {suspendedGames.length > 0 && (
@@ -1002,6 +1076,7 @@ export default function App() {
             {currentView === 'settings' && <SettingsView profile={activeProfile as any} onBack={() => setCurrentView('home')} onLogout={handleLogout} isGuestMode={isGuestMode} />}
           </AnimatePresence>
         </main>
+      </div>
       </div>
     </>
   );

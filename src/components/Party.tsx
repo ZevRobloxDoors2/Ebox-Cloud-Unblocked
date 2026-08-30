@@ -21,9 +21,50 @@ export const Party: React.FC<{ profile: any, onBack: () => void, initialPartyId?
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [friendsList, setFriendsList] = useState<any[]>([]);
   const [micError, setMicError] = useState('');
+  const [speakingPeers, setSpeakingPeers] = useState<Record<string, boolean>>({});
+  const audioContexts = useRef<Record<string, AudioContext>>({});
+  const analyzers = useRef<Record<string, AnalyserNode>>({});
   const localStream = useRef<MediaStream | null>(null);
   const peers = useRef<Record<string, RTCPeerConnection>>({});
   
+
+  useEffect(() => {
+    let animationFrameId: number;
+    const updateSpeakingStates = () => {
+      const dataArray = new Uint8Array(256);
+      const newSpeakingPeers: Record<string, boolean> = {};
+      
+      Object.entries(analyzers.current).forEach(([peerId, analyzer]) => {
+        (analyzer as AnalyserNode).getByteFrequencyData(dataArray);
+        // Calculate average volume
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          sum += dataArray[i];
+        }
+        const average = sum / dataArray.length;
+        // Threshold for detecting speech (adjust if necessary)
+        newSpeakingPeers[peerId] = average > 10; 
+      });
+      
+      setSpeakingPeers(prev => {
+        // Only update state if something changed to avoid rapid re-renders
+        let changed = false;
+        for (const key in newSpeakingPeers) {
+          if (prev[key] !== newSpeakingPeers[key]) changed = true;
+        }
+        for (const key in prev) {
+          if (prev[key] !== newSpeakingPeers[key]) changed = true;
+        }
+        return changed ? newSpeakingPeers : prev;
+      });
+      
+      animationFrameId = requestAnimationFrame(updateSpeakingStates);
+    };
+    
+    updateSpeakingStates();
+    
+    return () => cancelAnimationFrame(animationFrameId);
+  }, []);
 
   useEffect(() => {
     // Always listen to party members
@@ -65,6 +106,32 @@ export const Party: React.FC<{ profile: any, onBack: () => void, initialPartyId?
       // 2. Get local audio
       try {
         localStream.current = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        
+        // Setup local audio visualizer
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        const ctx = new AudioContext();
+        const src = ctx.createMediaStreamSource(localStream.current);
+        const analyzer = ctx.createAnalyser();
+        analyzer.fftSize = 256;
+        src.connect(analyzer);
+        
+        audioContexts.current[profile.uid] = ctx;
+        analyzers.current[profile.uid] = analyzer;
+        
+        const dataArray = new Uint8Array(analyzer.frequencyBinCount);
+        const checkLocalAudio = () => {
+           if (!analyzers.current[profile.uid]) return;
+           analyzer.getByteFrequencyData(dataArray);
+           let sum = 0;
+           for (let i = 0; i < dataArray.length; i++) {
+             sum += dataArray[i];
+           }
+           const average = sum / dataArray.length;
+           const isSpeaking = average > 10;
+           setSpeakingPeers(prev => prev[profile.uid] === isSpeaking ? prev : { ...prev, [profile.uid]: isSpeaking });
+           requestAnimationFrame(checkLocalAudio);
+        };
+        checkLocalAudio();
       } catch(e) {
         console.error("No mic", e);
       }
@@ -99,6 +166,10 @@ export const Party: React.FC<{ profile: any, onBack: () => void, initialPartyId?
       }
       Object.values(peers.current).forEach((pc: any) => pc.close());
       peers.current = {};
+      Object.values(audioContexts.current).forEach(ctx => (ctx as any).close().catch(()=>{}));
+      audioContexts.current = {};
+      analyzers.current = {};
+      setSpeakingPeers({});
       await deleteDoc(doc(db, 'parties', partyId, 'members', profile.uid));
     };
 
@@ -197,10 +268,55 @@ export const Party: React.FC<{ profile: any, onBack: () => void, initialPartyId?
       audio = document.createElement('audio');
       audio.id = `audio-${peerId}`;
       audio.autoplay = true;
+      (audio as any).playsInline = true;
       document.body.appendChild(audio);
     }
-    audio.srcObject = stream;
-    audio.play().catch(e => console.error('Audio play error:', e));
+    
+    // Create a new stream that only contains the audio track to prevent silent errors
+    if (stream.getAudioTracks().length > 0) {
+      const audioStream = new MediaStream([stream.getAudioTracks()[0]]);
+      audio.srcObject = audioStream;
+    } else {
+      audio.srcObject = stream;
+    }
+    
+    // Explicitly play it with user interaction fallback context
+    setTimeout(() => {
+      audio.play().catch(e => console.error('Audio play error for peer', peerId, ':', e));
+    }, 500);
+
+    // Audio Visualizer Setup
+    if (!audioContexts.current[peerId]) {
+       try {
+         const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+         const ctx = new AudioContext();
+         const src = ctx.createMediaStreamSource(stream);
+         const analyzer = ctx.createAnalyser();
+         analyzer.fftSize = 256;
+         src.connect(analyzer);
+         analyzer.connect(ctx.destination);
+         
+         audioContexts.current[peerId] = ctx;
+         analyzers.current[peerId] = analyzer;
+         
+         const dataArray = new Uint8Array(analyzer.frequencyBinCount);
+         const checkAudio = () => {
+           if (!analyzers.current[peerId]) return;
+           analyzer.getByteFrequencyData(dataArray);
+           let sum = 0;
+           for (let i = 0; i < dataArray.length; i++) {
+             sum += dataArray[i];
+           }
+           const average = sum / dataArray.length;
+           const isSpeaking = average > 10;
+           setSpeakingPeers(prev => prev[peerId] === isSpeaking ? prev : { ...prev, [peerId]: isSpeaking });
+           requestAnimationFrame(checkAudio);
+         };
+         checkAudio();
+       } catch (e) {
+         console.error('Audio context error:', e);
+       }
+    }
   };
 
   const toggleMute = async () => {
@@ -314,13 +430,13 @@ export const Party: React.FC<{ profile: any, onBack: () => void, initialPartyId?
                     {member.gamertag?.charAt(0).toUpperCase()}
                   </div>
                 )}
-                {!member.isMuted && (
-                  <div className="absolute -inset-1 rounded-full border-2 border-green-500 animate-pulse pointer-events-none"></div>
+                {!member.isMuted && speakingPeers[member.id] && (
+                  <div className="absolute -inset-1 rounded-full border-2 border-green-500 animate-pulse pointer-events-none shadow-[0_0_15px_rgba(34,197,94,0.6)]"></div>
                 )}
               </div>
               <div className="flex flex-col">
                 <span className="font-semibold text-lg">{member.gamertag}</span>
-                <span className="text-sm text-zinc-400">{member.isMuted ? 'Muted' : 'Speaking...'}</span>
+                <span className="text-sm text-zinc-400">{member.isMuted ? 'Muted' : (speakingPeers[member.id] ? 'Speaking...' : 'Listening')}</span>
               </div>
             </div>
             <div className="text-zinc-500">

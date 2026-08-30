@@ -10,7 +10,7 @@ export default defineConfig(({mode, command}) => {
   
   const plugins = [react(), tailwindcss()];
   if (command === 'build') {
-    plugins.push(viteSingleFile());
+    plugins.push(viteSingleFile() as any);
   }
   
   return {

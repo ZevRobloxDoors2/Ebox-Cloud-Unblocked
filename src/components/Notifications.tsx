@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { ChevronLeft, Bell, UserPlus, Info } from 'lucide-react';
 import { UserProfile, FriendRequest } from '../types';
 import { db } from '../firebase';
-import { collection, query, where, getDocs, updateDoc, doc, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, deleteDoc, doc, onSnapshot, orderBy } from 'firebase/firestore';
 
 interface NotificationsProps {
   key?: string;
@@ -66,6 +66,16 @@ export function Notifications({ userProfile, onBack }: NotificationsProps) {
     }
   };
 
+  const handleClearAll = async () => {
+    try {
+      for (const alert of alerts) {
+        await deleteDoc(doc(db, 'systemAlerts', alert.id));
+      }
+    } catch (e: any) {
+      console.error(e);
+    }
+  };
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="px-12 max-w-4xl mx-auto flex flex-col gap-8 pt-8 pb-12 h-full overflow-y-auto w-full">
       <div className="flex items-center gap-4 border-b border-white/10 pb-6 shrink-0">
@@ -109,7 +119,10 @@ export function Notifications({ userProfile, onBack }: NotificationsProps) {
 
         {alerts.length > 0 && (
           <div className="flex flex-col gap-3 mt-4">
-            <h3 className="text-lg font-bold text-zinc-300 uppercase tracking-wider text-sm mb-2">System Alerts</h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-bold text-zinc-300 uppercase tracking-wider text-sm">System Alerts</h3>
+              <button onClick={handleClearAll} className="text-red-400 hover:text-red-300 text-sm font-bold bg-red-900/20 px-3 py-1 rounded-md transition-colors">Clear All</button>
+            </div>
             {alerts.map(alert => (
               <div key={alert.id} className={`bg-zinc-800/80 p-4 rounded-lg flex items-start gap-4 border border-transparent hover:border-white/10 transition-colors ${!alert.read ? 'border-l-4 border-l-blue-500' : 'opacity-70'}`}>
                 <div className="w-10 h-10 bg-blue-900/50 text-blue-400 rounded-full flex items-center justify-center shrink-0 mt-1">
@@ -118,7 +131,7 @@ export function Notifications({ userProfile, onBack }: NotificationsProps) {
                 <div className="flex-1">
                   <span className="font-bold text-lg">{alert.title}</span>
                   <p className="text-zinc-300 mt-1">{alert.message}</p>
-                  <p className="text-zinc-500 text-xs mt-2">{new Date(alert.createdAt).toLocaleString()}</p>
+                  <p className="text-zinc-500 text-xs mt-2">{alert.createdAt ? (alert.createdAt.toDate ? alert.createdAt.toDate().toLocaleString() : new Date(alert.createdAt).toLocaleString()) : ''}</p>
                 </div>
                 {!alert.read && (
                   <button onClick={() => markAlertRead(alert.id)} className="text-sm font-bold text-blue-400 hover:text-blue-300">Mark Read</button>

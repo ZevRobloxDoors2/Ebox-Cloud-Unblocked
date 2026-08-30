@@ -92,7 +92,9 @@ export function Settings({ profile, onBack, onLogout, isGuestMode }: { profile: 
 
   // Load cloaking states
   const [cloakTitle, setCloakTitle] = useState(localStorage.getItem('cloak_title') || 'Google');
-  const [cloakIcon, setCloakIcon] = useState(localStorage.getItem('cloak_icon') || 'https://www.google.com/favicon.ico');
+  const [cloakIcon, setCloakIcon] = useState(localStorage.getItem('cloak_icon') || 'https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico');
+  const [panicKey, setPanicKey] = useState(localStorage.getItem('panic_key') || '`');
+
   const [mobileSizer, setMobileSizer] = useState(localStorage.getItem('mobile_sizer') === 'true');
   const [sortAZ, setSortAZ] = useState(localStorage.getItem('sort_az') === 'true');
   const [antiDeledao, setAntiDeledao] = useState(localStorage.getItem('anti_deledao') === 'true');
@@ -100,6 +102,9 @@ export function Settings({ profile, onBack, onLogout, isGuestMode }: { profile: 
   const [autoAboutBlank, setAutoAboutBlank] = useState(localStorage.getItem('auto_about_blank') === 'true');
   const [notDisturb, setNotDisturb] = useState(localStorage.getItem('not_disturb') === 'true');
   const [muteNotifications, setMuteNotifications] = useState(localStorage.getItem('mute_notifications') === 'true');
+  const [customCursor, setCustomCursor] = useState(localStorage.getItem('custom_cursor') !== 'false');
+  const [cursorPreset, setCursorPreset] = useState(localStorage.getItem('cursor_preset') || 'crosshair');
+  const [ideMode, setIdeMode] = useState(localStorage.getItem('ide_mode') === 'true');
 
   useEffect(() => {
     localStorage.setItem('mobile_sizer', mobileSizer.toString());
@@ -112,12 +117,12 @@ export function Settings({ profile, onBack, onLogout, isGuestMode }: { profile: 
     window.dispatchEvent(new Event('storage'));
   }, [mobileSizer, sortAZ, antiDeledao, drmEnabled, autoAboutBlank, notDisturb, muteNotifications]);
 
-  // Set default cloak to Google on first load
+  // Set default cloak to Google Classroom on first load
   useEffect(() => {
     if (!localStorage.getItem('cloak_title')) {
-      localStorage.setItem('cloak_title', 'Google');
-      localStorage.setItem('cloak_icon', 'https://www.google.com/favicon.ico');
-      document.title = 'Google';
+      localStorage.setItem('cloak_title', 'Classes');
+      localStorage.setItem('cloak_icon', 'https://ssl.gstatic.com/classroom/favicon.png');
+      document.title = 'Classes';
       let link = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
       if (!link) {
         link = document.createElement('link');
@@ -143,8 +148,8 @@ export function Settings({ profile, onBack, onLogout, isGuestMode }: { profile: 
     link.href = icon || 'https://www.google.com/favicon.ico';
   };
 
-  const handleResetCloak = () => applyCloak('Google', 'https://www.google.com/favicon.ico');
-  const handleSetCloakGoogle = () => applyCloak('Google', 'https://www.google.com/favicon.ico');
+  const handleResetCloak = () => applyCloak('Google Docs - Edit Document', 'https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico');
+  const handleSetCloakGoogle = () => applyCloak('Google Docs - Edit Document', 'https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico');
   const handleSetCloakCanvas = () => applyCloak('Canvas', 'https://du11hjcvx0uqb.cloudfront.net/br/dist/images/favicon-e10d657a73.ico');
 
   const openAboutBlank = () => {
@@ -194,7 +199,7 @@ export function Settings({ profile, onBack, onLogout, isGuestMode }: { profile: 
           </div>
         </div>
       )}
-    <motion.div key="settings" initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="flex flex-1 min-h-0 pb-12">
+    <motion.div key="settings" initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="flex flex-1 min-h-0 h-full pb-12 px-12 w-full max-w-7xl mx-auto gap-8 overflow-y-auto custom-scroll">
       <div className="w-64 flex flex-col gap-2 shrink-0">
         <div className="flex items-center gap-4 mb-4">
           <button onClick={onBack} className="p-2 hover:bg-white/10 rounded-full transition-colors -ml-4">
@@ -213,7 +218,7 @@ export function Settings({ profile, onBack, onLogout, isGuestMode }: { profile: 
         </button>
       </div>
       
-      <div className="flex-1 bg-zinc-900/50 rounded-xl p-8 border border-transparent flex flex-col gap-8 overflow-y-auto">
+      <div className="flex-1 bg-zinc-900/50 rounded-xl p-8 border border-transparent flex flex-col gap-8">
         {activeTab === 'general' && (
           <>
 
@@ -319,6 +324,39 @@ export function Settings({ profile, onBack, onLogout, isGuestMode }: { profile: 
                   </div>
                   <input type="checkbox" checked={drmEnabled} onChange={(e) => setDrmEnabled(e.target.checked)} className="w-5 h-5 accent-red-500" />
                 </label>
+                <label className="flex items-center justify-between p-4 bg-black/40 rounded-lg cursor-pointer">
+                  <div>
+                    <span className="font-bold text-blue-400">Study Mode (IDE Camouflage)</span>
+                    <p className="text-xs text-zinc-400">Redesigns the site to look like VS Code. Great for defeating thumbnail screenshots.</p>
+                  </div>
+                  <input type="checkbox" checked={ideMode} onChange={(e) => { setIdeMode(e.target.checked); localStorage.setItem('ide_mode', String(e.target.checked)); }} className="w-5 h-5 accent-blue-500" />
+                </label>
+                <div className="flex items-center justify-between p-4 bg-black/40 rounded-lg cursor-pointer">
+                  <div>
+                    <span className="font-bold">Panic Button Key</span>
+                    <p className="text-xs text-zinc-400">Pressing this key instantly redirects you to Google Classroom.</p>
+                  </div>
+                  <input type="text" maxLength={1} value={panicKey} onChange={(e) => { setPanicKey(e.target.value); localStorage.setItem('panic_key', e.target.value); }} className="w-12 h-10 bg-zinc-900 border border-zinc-700 text-center font-bold text-xl rounded focus:border-green-500 outline-none uppercase" />
+                </div>
+                <div className="flex flex-col gap-2 p-4 bg-black/40 rounded-lg">
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <div>
+                      <span className="font-bold">Custom Cursor</span>
+                      <p className="text-xs text-zinc-400">Use a custom Ebox cursor instead of default system cursor.</p>
+                    </div>
+                    <input type="checkbox" checked={customCursor} onChange={(e) => { setCustomCursor(e.target.checked); localStorage.setItem('custom_cursor', String(e.target.checked)); window.dispatchEvent(new Event('storage')); }} className="w-5 h-5 accent-green-500" />
+                  </label>
+                  {customCursor && (
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/10">
+                      <span className="font-bold text-sm text-zinc-400">Preset</span>
+                      <select value={cursorPreset} onChange={(e) => { setCursorPreset(e.target.value); localStorage.setItem('cursor_preset', e.target.value); window.dispatchEvent(new Event('storage')); }} className="bg-zinc-800 border border-zinc-700 rounded p-1 text-sm outline-none">
+                        <option value="crosshair">Crosshair</option>
+                        <option value="default">Default Pointer</option>
+                        <option value="gaming">Gaming Neon</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
                 <label className="flex items-center justify-between p-4 bg-black/40 rounded-lg cursor-pointer">
                   <div>
                     <span className="font-bold text-red-400">Anti Deledao</span>

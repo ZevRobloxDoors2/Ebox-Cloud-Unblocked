@@ -20,6 +20,7 @@ export interface FriendRequest {
   status: 'pending' | 'accepted' | 'rejected';
   createdAt: string;
   imageUrl?: string;
+  readBy?: string[];
 }
 
 export interface ChatMessage {
@@ -28,4 +29,5 @@ export interface ChatMessage {
   text: string;
   createdAt: string;
   imageUrl?: string;
+  readBy?: string[];
 }
