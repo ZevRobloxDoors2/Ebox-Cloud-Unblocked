@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { ChevronLeft, Users, Mic, MicOff, PhoneOff } from 'lucide-react';
+import { ChevronLeft, Users, Mic, MicOff, PhoneOff, Headphones, Volume2, VolumeX } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, onSnapshot, updateDoc, setDoc, deleteDoc, collection, serverTimestamp, addDoc, getDoc, query, or, where } from 'firebase/firestore';
 
@@ -16,6 +16,8 @@ export const Party: React.FC<{ profile: any, onBack: () => void, initialPartyId?
   const [partyId] = useState(initialPartyId || Math.random().toString(36).substring(2, 9));
   const [partyMembers, setPartyMembers] = useState<any[]>([]);
   const [isMuted, setIsMuted] = useState(false);
+  const [isDeafened, setIsDeafened] = useState(false);
+  const [peerMutes, setPeerMutes] = useState<Record<string, boolean>>({});
   const [micPermissionGranted, setMicPermissionGranted] = useState(false);
   const [inParty, setInParty] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -239,21 +241,27 @@ export const Party: React.FC<{ profile: any, onBack: () => void, initialPartyId?
       };
     }
 
-    if (data.type === 'offer' && data.offer) {
-      await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      const sigRef = doc(db, 'parties', partyId, 'members', peerId, 'signals', profile.uid);
-      await setDoc(sigRef, { type: 'answer', answer: { type: answer.type, sdp: answer.sdp } }, { merge: true });
+    if (data.type === 'offer' && data.offer && !(pc as any).hasSetRemote) {
+      (pc as any).hasSetRemote = true;
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        const sigRef = doc(db, 'parties', partyId, 'members', peerId, 'signals', profile.uid);
+        await setDoc(sigRef, { type: 'answer', answer: { type: answer.type, sdp: answer.sdp } }, { merge: true });
+      } catch(e) { console.error("Error handling offer", e); }
     }
 
-    if (data.type === 'answer' && data.answer) {
-      if (!pc.currentRemoteDescription) {
-        await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-      }
+    if (data.type === 'answer' && data.answer && !(pc as any).hasSetRemote) {
+      (pc as any).hasSetRemote = true;
+      try {
+        if (!pc.currentRemoteDescription) {
+          await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+        }
+      } catch(e) { console.error("Error handling answer", e); }
     }
 
-    if (data.candidates && pc.currentRemoteDescription) {
+    if (data.candidates && pc.remoteDescription) {
       for (const cand of data.candidates) {
         try {
           await pc.addIceCandidate(new RTCIceCandidate(cand));
@@ -318,13 +326,42 @@ export const Party: React.FC<{ profile: any, onBack: () => void, initialPartyId?
     }
   };
 
-  const toggleMute = async () => {
+  useEffect(() => {
     if (localStream.current) {
-      localStream.current.getAudioTracks().forEach(t => t.enabled = isMuted);
+      localStream.current.getAudioTracks().forEach(t => {
+        t.enabled = !(isMuted || isDeafened);
+      });
     }
+  }, [isMuted, isDeafened]);
+
+  useEffect(() => {
+    partyMembers.forEach(m => {
+      if (m.uid === profile?.uid) return;
+      const audio = document.getElementById(`audio-${m.uid}`) as HTMLAudioElement;
+      if (audio) {
+        audio.muted = isDeafened || !!peerMutes[m.uid];
+      }
+    });
+  }, [isDeafened, peerMutes, partyMembers, profile?.uid]);
+
+  const toggleMute = async () => {
     const memberRef = doc(db, 'parties', partyId, 'members', profile.uid);
     await updateDoc(memberRef, { isMuted: !isMuted });
     setIsMuted(!isMuted);
+    // If we unmute, and we are deafened, we should probably undeafen?
+    if (isMuted && isDeafened) {
+      setIsDeafened(false);
+    }
+  };
+
+  const toggleDeafen = async () => {
+    const newDeafened = !isDeafened;
+    setIsDeafened(newDeafened);
+    if (newDeafened && !isMuted) {
+      setIsMuted(true);
+      const memberRef = doc(db, 'parties', partyId, 'members', profile.uid);
+      await updateDoc(memberRef, { isMuted: true });
+    }
   };
 
   useEffect(() => {
@@ -402,6 +439,12 @@ export const Party: React.FC<{ profile: any, onBack: () => void, initialPartyId?
               {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
             </button>
             <button 
+              onClick={toggleDeafen}
+              className={`p-3 rounded-full flex items-center justify-center transition-colors focus:ring-2 focus:ring-white focus:outline-none ${isDeafened ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30' : 'bg-zinc-800 text-white hover:bg-zinc-700'}`}
+            >
+              <Headphones size={20} />
+            </button>
+            <button 
               onClick={() => setInParty(false)}
               className="p-3 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white transition-colors focus:ring-2 focus:ring-white focus:outline-none"
             >
@@ -438,8 +481,26 @@ export const Party: React.FC<{ profile: any, onBack: () => void, initialPartyId?
                 <span className="text-sm text-zinc-400">{member.isMuted ? 'Muted' : (speakingPeers[member.id] ? 'Speaking...' : 'Listening')}</span>
               </div>
             </div>
-            <div className="text-zinc-500">
-              {member.isMuted ? <MicOff size={20} /> : <Mic size={20} className="text-green-500" />}
+            <div className="flex items-center gap-2">
+              {member.id === profile.uid ? (
+                <>
+                  <button onClick={toggleDeafen} className={`p-2 rounded-full transition-colors ${isDeafened ? 'bg-red-500 text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`} title="Deafen">
+                    <Headphones size={18} />
+                  </button>
+                  <button onClick={toggleMute} className={`p-2 rounded-full transition-colors ${isMuted ? 'bg-red-500 text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`} title="Mute">
+                    {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button onClick={() => setPeerMutes(prev => ({...prev, [member.id]: !prev[member.id]}))} className={`p-2 rounded-full transition-colors ${peerMutes[member.id] ? 'bg-red-500 text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`} title={peerMutes[member.id] ? 'Unmute User' : 'Mute User'}>
+                    {peerMutes[member.id] ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                  </button>
+                  <div className="p-2 text-zinc-500 flex items-center justify-center">
+                    {member.isMuted ? <MicOff size={18} /> : <Mic size={18} className="text-green-500" />}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         ))}

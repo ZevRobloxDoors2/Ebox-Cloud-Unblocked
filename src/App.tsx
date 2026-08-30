@@ -242,22 +242,40 @@ export default function App() {
           video.style.position = 'fixed';
           video.style.top = '0';
           video.style.left = '0';
-          video.style.width = '100%';
-          video.style.height = '100%';
+          video.style.width = '100vw';
+          video.style.height = '100vh';
           video.style.pointerEvents = 'none';
-          video.style.zIndex = '-9999';
-          video.style.opacity = '0.001';
-          video.src = 'https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd';
-          // Not real DRM but some screenshot blockers trigger on video elements or EME requests
+          video.style.zIndex = '999999';
+          // Use a CSS filter to make it essentially invisible but still rendered by compositor
+          video.style.filter = 'opacity(0.01)';
           video.muted = true;
           document.body.appendChild(video);
           
-          if (navigator.requestMediaKeySystemAccess) {
-            navigator.requestMediaKeySystemAccess('com.widevine.alpha', [{
-              initDataTypes: ['cenc'],
-              videoCapabilities: [{contentType: 'video/mp4; codecs="avc1.42E01E"'}]
-            }]).catch(() => {});
-          }
+          const setupDRM = async () => {
+            const keySystems = ['com.widevine.alpha', 'com.microsoft.playready', 'com.apple.fps.1_0'];
+            const configs = [{
+              initDataTypes: ['cenc', 'keyids', 'webm'],
+              videoCapabilities: [
+                { contentType: 'video/mp4; codecs="avc1.42E01E"' },
+                { contentType: 'video/webm; codecs="vp8"' }
+              ]
+            }];
+            
+            for (const ks of keySystems) {
+              try {
+                if (navigator.requestMediaKeySystemAccess) {
+                  const access = await navigator.requestMediaKeySystemAccess(ks, configs);
+                  const keys = await access.createMediaKeys();
+                  await video.setMediaKeys(keys);
+                  break; // Stop after first successful attachment
+                }
+              } catch (e) {
+                // Ignore and try next
+              }
+            }
+          };
+          
+          setupDRM();
         }
       } else {
         document.documentElement.removeAttribute('data-drm-enabled');
