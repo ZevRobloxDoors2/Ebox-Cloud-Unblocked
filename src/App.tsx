@@ -599,7 +599,7 @@ export default function App() {
           </div>
         </div>
       )}
-      <div className={`flex-1 flex flex-col ${ideMode ? "ml-64 mt-9" : ""} relative z-10`}>
+      <div className={`flex-1 min-h-0 flex flex-col ${ideMode ? "ml-64 mt-9" : ""} relative z-10`}>
         <WelcomeMessage />
         <div className="fixed inset-0 z-[-1] opacity-50">
           <div className="absolute inset-0 bg-gradient-to-tr from-black/80 via-transparent to-black/40" />
@@ -929,7 +929,6 @@ export default function App() {
                       <div className="absolute inset-0 pointer-events-none z-[105]" style={{ backgroundImage: 'url(https://upload.wikimedia.org/wikipedia/commons/c/c3/Google_Docs_logo_%282014-2020%29.svg)', backgroundRepeat: 'repeat', opacity: 0.1 }} />
                     )}
 
-
                     {g.id === 'GTA V' && playingGame?.id === g.id && !isLoadingGame && (
                       <div className="absolute top-4 left-4 z-[200] bg-zinc-900 border-2 border-red-500 p-4 rounded-lg shadow-2xl max-w-sm pointer-events-auto">
                         <div className="flex justify-between items-start mb-2">
@@ -961,7 +960,7 @@ export default function App() {
         <main className="flex-1 min-h-0 overflow-hidden relative z-10 flex flex-col w-full">
           <AnimatePresence mode="wait">
             {currentView === 'home' && (
-              <motion.div key="home" initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="flex flex-col flex-1 overflow-y-auto pb-8">
+              <motion.div key="home" initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="flex flex-col flex-1 min-h-0 overflow-y-auto pb-8">
                 <div className="flex gap-4 shrink-0 overflow-x-auto pb-4 items-center px-12 pt-8">
                   <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentView('library')} onClick={() => setCurrentView('library')} className="w-[160px] h-[160px] bg-zinc-800/90 rounded-lg flex flex-col justify-center items-center border-[3px] border-transparent hover:border-green-500 focus:border-green-500 focus:outline-none group cursor-pointer flex-shrink-0 transition-all duration-300 ease-out hover:scale-110 focus:scale-110 hover:shadow-[0_0_20px_rgba(34,197,94,0.6)] focus:shadow-[0_0_20px_rgba(34,197,94,0.6)] hover:z-10 focus:z-10">
                     <Library className="text-zinc-300 mb-2 group-hover:text-white transition-colors" size={48} />
@@ -988,8 +987,6 @@ export default function App() {
                     <Flame size={48} className="text-white mb-2 group-hover:text-yellow-400 transition-colors" />
                     <span className="font-semibold text-sm text-white">Activity</span>
                   </div>
-
-
                     
                 </div>
 
@@ -1021,7 +1018,7 @@ export default function App() {
             )}
 
             {currentView === 'library' && (
-              <motion.div key="library" initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="flex flex-col flex-1 overflow-hidden px-12 pt-8">
+              <motion.div key="library" initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="flex flex-col flex-1 min-h-0 h-full overflow-hidden px-12 pt-8">
                 <div className="flex items-center gap-4 mb-2 shrink-0">
                   <button onClick={() => setCurrentView('home')} className="p-2 hover:bg-white/10 rounded-full transition-colors -ml-2">
                     <ChevronLeft size={24} />
@@ -1043,7 +1040,7 @@ export default function App() {
                       Apps
                     </button>
                   </div>
-                  <div className="flex-1 overflow-y-auto">
+                  <div className="flex-1 overflow-y-auto min-h-0">
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 pb-12">
                       {displayGames.filter(g => (g as any).type === (libraryTab === 'games' ? 'game' : 'app')).map(item => (
                         <div tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handlePlayGame({id: item.id, title: item.title, file: item.file})} key={item.id} onClick={() => handlePlayGame({id: item.id, title: item.title, file: item.file})} className="group cursor-pointer">

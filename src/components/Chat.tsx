@@ -279,7 +279,7 @@ export function Chat({ userProfile, friendId, friendGamertag, chatId: propChatId
                       </div>
                     )}
                     <span className={`text-[10px] opacity-60 block mt-1 ${isMe ? 'text-right' : 'text-left'}`}>
-                      {m.createdAt ? (m.createdAt.toDate ? m.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (typeof m.createdAt === 'number' || typeof m.createdAt === 'string' ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '')) : ''}
+                      {m.createdAt ? (m.createdAt.toDate ? m.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (typeof m.createdAt === 'number' || typeof m.createdAt === 'string' ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now')) : 'Just now'}
                     </span>
                     
                     {isMe && (

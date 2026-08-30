@@ -274,8 +274,7 @@ export const Party: React.FC<{ profile: any, onBack: () => void, initialPartyId?
     
     // Create a new stream that only contains the audio track to prevent silent errors
     if (stream.getAudioTracks().length > 0) {
-      const audioStream = new MediaStream([stream.getAudioTracks()[0]]);
-      audio.srcObject = audioStream;
+      audio.srcObject = stream;
     } else {
       audio.srcObject = stream;
     }

@@ -199,7 +199,7 @@ export function Settings({ profile, onBack, onLogout, isGuestMode }: { profile: 
           </div>
         </div>
       )}
-    <motion.div key="settings" initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="flex flex-1 min-h-0 h-full pb-12 px-12 w-full max-w-7xl mx-auto gap-8 overflow-y-auto custom-scroll">
+    <motion.div key="settings" initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="flex flex-1 min-h-0 h-full pb-12 px-12 w-full max-w-7xl mx-auto gap-8 overflow-y-auto">
       <div className="w-64 flex flex-col gap-2 shrink-0">
         <div className="flex items-center gap-4 mb-4">
           <button onClick={onBack} className="p-2 hover:bg-white/10 rounded-full transition-colors -ml-4">
@@ -218,7 +218,7 @@ export function Settings({ profile, onBack, onLogout, isGuestMode }: { profile: 
         </button>
       </div>
       
-      <div className="flex-1 bg-zinc-900/50 rounded-xl p-8 border border-transparent flex flex-col gap-8">
+      <div className="flex-1 bg-zinc-900/50 rounded-xl p-8 border border-transparent flex flex-col gap-8 overflow-y-auto custom-scroll min-h-0">
         {activeTab === 'general' && (
           <>
 

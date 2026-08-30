@@ -51,17 +51,24 @@ export function Friends({ userProfile, onBack, onChat }: FriendsProps) {
       
       // Compute friends
       const accepted = data.filter(r => r.status === 'accepted');
-      const friendList: {uid: string, gamertag: string}[] = [];
+      const friendList: {uid: string, gamertag: string, status?: string, score?: number}[] = [];
       
       for (const r of accepted) {
         if (r.fromUid === auth.currentUser!.uid) {
           // Fetch to user's gamertag
           const userDoc = await getDocs(query(collection(db, 'users'), where('uid', '==', r.toUid)));
           if (!userDoc.empty) {
-            friendList.push({ uid: r.toUid, gamertag: (userDoc.docs[0].data() as UserProfile).gamertag });
+            const uData = userDoc.docs[0].data() as UserProfile;
+            friendList.push({ uid: r.toUid, gamertag: uData.gamertag, status: uData.status, score: uData.score });
           }
         } else {
-          friendList.push({ uid: r.fromUid, gamertag: r.fromGamertag });
+           const userDoc = await getDocs(query(collection(db, 'users'), where('uid', '==', r.fromUid)));
+           if (!userDoc.empty) {
+             const uData = userDoc.docs[0].data() as UserProfile;
+             friendList.push({ uid: r.fromUid, gamertag: uData.gamertag, status: uData.status, score: uData.score });
+           } else {
+             friendList.push({ uid: r.fromUid, gamertag: r.fromGamertag });
+           }
         }
       }
       setFriends(friendList.filter((v,i,a)=>a.findIndex(t=>(t.uid === v.uid))===i));
@@ -157,7 +164,7 @@ export function Friends({ userProfile, onBack, onChat }: FriendsProps) {
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="px-12 max-w-5xl mx-auto flex flex-col gap-8 pt-8 pb-12 h-full overflow-y-auto w-full">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="px-12 max-w-5xl mx-auto flex flex-col flex-1 min-h-0 h-full gap-8 pt-8 pb-12 overflow-y-auto w-full">
       <div className="flex items-center gap-4 border-b border-white/10 pb-6 shrink-0">
         <button onClick={onBack} className="p-2 hover:bg-white/10 rounded-full transition-colors -ml-2">
           <ChevronLeft size={24} />
@@ -245,9 +252,15 @@ export function Friends({ userProfile, onBack, onChat }: FriendsProps) {
             <p className="text-zinc-400 text-sm">You haven't added any friends yet. Search for friends using the search above!</p>
           ) : (
             <div className="flex flex-col gap-3 max-h-96 overflow-y-auto">
-              {friends.map(f => (
+              {friends.map((f: any) => (
                 <div key={f.uid} className="bg-zinc-900 p-4 rounded-md flex items-center justify-between group hover:bg-zinc-800 transition-colors">
-                  <span className="font-semibold">{f.gamertag}</span>
+                  <div className="flex flex-col">
+                    <span className="font-semibold">{f.gamertag}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${f.status === 'Online' ? 'bg-green-500' : (f.status === 'Do not disturb' ? 'bg-red-500' : 'bg-zinc-500')}`} />
+                      <span className="text-xs text-zinc-400">{f.status || 'Appear offline'}</span>
+                    </div>
+                  </div>
                   <button 
                     onClick={() => onChat(f.uid, f.gamertag, false)} 
                     className="bg-zinc-700 hover:bg-zinc-600 text-white p-2 rounded-full transition-colors opacity-0 group-hover:opacity-100"

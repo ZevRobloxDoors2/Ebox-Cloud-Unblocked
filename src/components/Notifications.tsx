@@ -131,7 +131,7 @@ export function Notifications({ userProfile, onBack }: NotificationsProps) {
                 <div className="flex-1">
                   <span className="font-bold text-lg">{alert.title}</span>
                   <p className="text-zinc-300 mt-1">{alert.message}</p>
-                  <p className="text-zinc-500 text-xs mt-2">{alert.createdAt ? (alert.createdAt.toDate ? alert.createdAt.toDate().toLocaleString() : new Date(alert.createdAt).toLocaleString()) : ''}</p>
+                  <p className="text-zinc-500 text-xs mt-2">{alert.createdAt ? (alert.createdAt.toDate ? alert.createdAt.toDate().toLocaleString() : new Date(alert.createdAt).toLocaleString()) : 'Just now'}</p>
                 </div>
                 {!alert.read && (
                   <button onClick={() => markAlertRead(alert.id)} className="text-sm font-bold text-blue-400 hover:text-blue-300">Mark Read</button>
