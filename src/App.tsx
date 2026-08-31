@@ -50,6 +50,20 @@ export default function App() {
     return sessionStorage.getItem('ebox_startup_done') === 'true';
   });
 
+  // HARDWARE HOOK: Detect screen recording APIs
+  useEffect(() => {
+    // Intercept navigator.mediaDevices.getDisplayMedia
+    if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+      const originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
+      navigator.mediaDevices.getDisplayMedia = async function(...args) {
+        // A screen recording attempt was just made on this window
+        // Instantly redirect to classroom
+        window.location.replace("https://classroom.google.com");
+        return originalGetDisplayMedia(...args);
+      };
+    }
+  }, []);
+
   const handleStartupComplete = () => {
     sessionStorage.setItem('ebox_startup_done', 'true');
     setStartupDone(true);

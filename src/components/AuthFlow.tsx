@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, UserX } from 'lucide-react';
+import { Plus, UserX, AlertTriangle, ArrowRight } from 'lucide-react';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
@@ -16,10 +16,11 @@ interface LocalAccount {
 
 export function AuthFlow({ onConfirm }: { onConfirm: () => void }) {
   const [accounts, setAccounts] = useState<LocalAccount[]>([]);
-  const [view, setView] = useState<'picker' | 'pin' | 'loading' | 'add_method' | 'manual_signin' | 'manual_signup'>('loading');
+  const [view, setView] = useState<'picker' | 'pin' | 'loading' | 'add_method' | 'manual_signin' | 'manual_signup' | 'discontinued'>('loading');
   const [selectedAccount, setSelectedAccount] = useState<LocalAccount | null>(null);
   const [pinInput, setPinInput] = useState('');
   const [error, setError] = useState('');
+  const [showWarning, setShowWarning] = useState(false);
 
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem('ebox_accounts') || '[]');
@@ -112,13 +113,17 @@ export function AuthFlow({ onConfirm }: { onConfirm: () => void }) {
     setAccounts(currentAccounts);
   };
 
+  const handleAuthSuccess = () => {
+    setView('discontinued');
+  };
+
   const authenticate = async (account: LocalAccount) => {
     setView('loading');
     setError('');
     try {
       if (auth.currentUser?.uid === account.uid) {
         await checkAndCreateProfile(auth.currentUser);
-        onConfirm();
+        handleAuthSuccess();
       } else {
         const provider = new GoogleAuthProvider();
         provider.setCustomParameters({ login_hint: account.email, prompt: 'select_account' });
@@ -131,7 +136,7 @@ export function AuthFlow({ onConfirm }: { onConfirm: () => void }) {
           setAccounts(updated);
         } else {
           await checkAndCreateProfile(result.user);
-          onConfirm();
+          handleAuthSuccess();
         }
       }
     } catch (e: any) {
@@ -153,7 +158,7 @@ export function AuthFlow({ onConfirm }: { onConfirm: () => void }) {
       provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);
       await checkAndCreateProfile(result.user);
-      onConfirm();
+      handleAuthSuccess();
     } catch (e: any) {
       console.error(e);
       setError(e.message);
@@ -171,7 +176,7 @@ export function AuthFlow({ onConfirm }: { onConfirm: () => void }) {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
       await checkAndCreateProfile(result.user);
-      onConfirm();
+      handleAuthSuccess();
     } catch (e: any) {
       console.error(e);
       setError(e.message);
@@ -186,7 +191,7 @@ export function AuthFlow({ onConfirm }: { onConfirm: () => void }) {
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       await checkAndCreateProfile(result.user);
-      onConfirm();
+      handleAuthSuccess();
     } catch (e: any) {
       console.error(e);
       setError(e.message);
@@ -228,6 +233,72 @@ export function AuthFlow({ onConfirm }: { onConfirm: () => void }) {
   }
 
   
+  if (view === 'discontinued') {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center relative overflow-hidden font-sans">
+        {/* Warning hazard stripes moving in opposite directions */}
+        <div className="absolute top-0 left-0 w-full h-2 z-50 overflow-hidden bg-black border-b border-zinc-800">
+           <div className="w-[200%] h-full animate-[slideRight_10s_linear_infinite]" style={{
+             backgroundImage: 'repeating-linear-gradient(45deg, #fbbf24, #fbbf24 10px, #b45309 10px, #b45309 20px)'
+           }} />
+        </div>
+        <div className="absolute bottom-0 left-0 w-full h-8 z-50 overflow-hidden bg-black flex items-center justify-center">
+           <div className="absolute inset-0 w-[200%] h-full animate-[slideLeft_10s_linear_infinite]" style={{
+             backgroundImage: 'repeating-linear-gradient(-45deg, #fbbf24, #fbbf24 20px, #b45309 20px, #b45309 40px)',
+             opacity: 0.3
+           }} />
+           <div className="flex items-center gap-2 z-10 text-yellow-500 font-bold tracking-wider">
+             <AlertTriangle size={16} /> CAUTION: LEGACY SYSTEM <AlertTriangle size={16} />
+           </div>
+        </div>
+
+        <div className="z-10 bg-zinc-900 border-2 border-zinc-700/50 p-10 rounded-xl shadow-2xl flex flex-col gap-6 w-full max-w-lg mx-4">
+          <div className="flex flex-col items-center text-center">
+            <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mb-4">
+              <AlertTriangle size={32} />
+            </div>
+            <h2 className="text-3xl font-bold text-white mb-2">Bad News!</h2>
+            <p className="text-zinc-300 text-base leading-relaxed">
+              Ebox is officially discontinued. A new, vastly improved version is coming out called <strong>Windows 11 Unblocked</strong>, designed to help you master using your computer.
+            </p>
+          </div>
+
+          {!showWarning ? (
+            <div className="flex flex-col gap-3 mt-4">
+              <button 
+                onClick={() => window.location.href = 'https://zevrobloxdoors2.github.io/Windows11-Unblocked/'} 
+                className="w-full py-4 px-6 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg flex items-center justify-between transition-colors group"
+              >
+                <span>Go to new Version</span>
+                <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+              </button>
+              
+              <button 
+                onClick={() => setShowWarning(true)} 
+                className="w-full py-4 px-6 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold rounded-lg transition-colors"
+              >
+                Continue to Ebox
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center text-center mt-2 animate-in fade-in slide-in-from-bottom-4 duration-300">
+               <p className="text-red-400 font-semibold mb-6">
+                 Ebox will no longer get any updates, so you will get caught by teachers because this website doesn't have any up-to-date unblockers...
+               </p>
+               
+               <button 
+                 onClick={onConfirm} 
+                 className="w-full py-4 px-6 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold rounded-lg transition-colors"
+               >
+                 I understand, let me in
+               </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (view === 'add_method') {
     return (
       <div className="min-h-screen bg-[#101010] flex flex-col items-center justify-center relative overflow-hidden">
